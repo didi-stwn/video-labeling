@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="pencil" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#EF4444"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square background (video frame) -->
+  <rect x="4" y="4" width="56" height="56" rx="12" ry="12" fill="url(#bg)"/>
+
+  <!-- Play triangle -->
+  <polygon points="26,20 26,44 44,32" fill="#ffffff" opacity="0.95"/>
+
+  <!-- Pencil/edit icon overlaid on bottom-right -->
+  <g transform="translate(34, 34)">
+    <!-- Pencil body -->
+    <path d="M4,18 L18,4 L22,8 L8,22 Z" fill="url(#pencil)" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
+    <!-- Pencil tip -->
+    <path d="M18,4 L22,8 L26,4 Z" fill="#D97706" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
+    <!-- Pencil lead -->
+    <path d="M24,6 L26,4 L28,6 Z" fill="#333"/>
+  </g>
+</svg>

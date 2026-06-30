@@ -1,0 +1,16 @@
+{
+  "short_name": "Video Labeling",
+  "name": "Video Labeling — Trim & Annotate",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#1E1E2E",
+  "background_color": "#F5F5F0"
+}
