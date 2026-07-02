@@ -1,21 +1,21 @@
 {
   "files": {
-    "main.css": "/video-labeling/static/css/main.9b509300.css",
-    "main.js": "/video-labeling/static/js/main.a90daa97.js",
+    "main.css": "/video-labeling/static/css/main.2ed81671.css",
+    "main.js": "/video-labeling/static/js/main.0ffb59fb.js",
     "static/js/733.7cf30fb7.chunk.js": "/video-labeling/static/js/733.7cf30fb7.chunk.js",
     "static/js/129.c0f071d7.chunk.js": "/video-labeling/static/js/129.c0f071d7.chunk.js",
     "static/js/453.bac7c263.chunk.js": "/video-labeling/static/js/453.bac7c263.chunk.js",
     "static/js/726.0cbad7b2.chunk.js": "/video-labeling/static/js/726.0cbad7b2.chunk.js",
     "index.html": "/video-labeling/index.html",
-    "main.9b509300.css.map": "/video-labeling/static/css/main.9b509300.css.map",
-    "main.a90daa97.js.map": "/video-labeling/static/js/main.a90daa97.js.map",
+    "main.2ed81671.css.map": "/video-labeling/static/css/main.2ed81671.css.map",
+    "main.0ffb59fb.js.map": "/video-labeling/static/js/main.0ffb59fb.js.map",
     "733.7cf30fb7.chunk.js.map": "/video-labeling/static/js/733.7cf30fb7.chunk.js.map",
     "129.c0f071d7.chunk.js.map": "/video-labeling/static/js/129.c0f071d7.chunk.js.map",
     "453.bac7c263.chunk.js.map": "/video-labeling/static/js/453.bac7c263.chunk.js.map",
     "726.0cbad7b2.chunk.js.map": "/video-labeling/static/js/726.0cbad7b2.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.9b509300.css",
-    "static/js/main.a90daa97.js"
+    "static/css/main.2ed81671.css",
+    "static/js/main.0ffb59fb.js"
   ]
 }
