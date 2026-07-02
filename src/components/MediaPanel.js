@@ -1,6 +1,7 @@
 import React, { useRef, useCallback, useState } from 'react';
 import { useVideo } from '../context/VideoContext';
-import { Upload, Video, Image as ImageIcon, Trash2, Plus } from 'lucide-react';
+import { Upload, Video, Image as ImageIcon, Monitor, Trash2, Plus, Square, Download } from 'lucide-react';
+import ScreenRecorderPiP from './ScreenRecorderPiP';
 
 export default function MediaPanel() {
   const { state, addVideo, addImage, deleteVideo, deleteImage, addClipToTrack } =
@@ -9,6 +10,9 @@ export default function MediaPanel() {
   const imageInputRef = useRef(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounter = useRef(0);
+  const [showRecorder, setShowRecorder] = useState(false);
+  const [recordingState, setRecordingState] = useState({ isRecording: false, seconds: 0, stop: null });
+  const stopRef = useRef(null);
 
   // Shared: process a list of File objects (from input change or drop)
   const processFiles = useCallback(
@@ -197,6 +201,32 @@ export default function MediaPanel() {
     [state.tracks, state.currentTime, addClipToTrack]
   );
 
+  const handleRecordingChange = useCallback(({ isRecording, seconds, stop }) => {
+    setRecordingState({ isRecording, seconds });
+    stopRef.current = stop;
+  }, []);
+
+  const handleStopFromSidebar = useCallback(() => {
+    if (stopRef.current) {
+      stopRef.current();
+    }
+  }, []);
+
+  const handleDownloadVideo = useCallback((video) => {
+    const a = document.createElement('a');
+    a.href = video.url;
+    a.download = video.name.endsWith('.webm') ? video.name : `${video.name}.webm`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }, []);
+
+  const formatTimer = (s) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+  };
+
   return (
     <div
       className={`media-panel${isDragOver ? ' media-panel-drag-over' : ''}`}
@@ -221,6 +251,28 @@ export default function MediaPanel() {
           >
             <ImageIcon size={14} /> Upload Image
           </button>
+
+          {recordingState.isRecording ? (
+            <button
+              className="upload-btn rec-btn rec-btn-recording"
+              onClick={handleStopFromSidebar}
+              title="Click to stop recording"
+            >
+              <span className="rec-sidebar-dot"></span>
+              <span className="rec-sidebar-timer">{formatTimer(recordingState.seconds)}</span>
+              <Square size={12} />
+            </button>
+          ) : (
+            <button
+              className="upload-btn rec-btn"
+              onClick={() => setShowRecorder(true)}
+              title="Record Screen"
+            >
+              <Monitor size={14} />
+              <span>Record Screen</span>
+            </button>
+          )}
+
           <input
             ref={videoInputRef}
             type="file"
@@ -274,6 +326,15 @@ export default function MediaPanel() {
                   >
                     <ImageIcon size={14} />
                   </button>
+                  {video.name.startsWith('Screen Recording') && (
+                    <button
+                      className="media-action-btn"
+                      onClick={() => handleDownloadVideo(video)}
+                      title="Download as WebM"
+                    >
+                      <Download size={14} />
+                    </button>
+                  )}
                   <button
                     className="media-action-btn danger"
                     onClick={() => deleteVideo(video.id)}
@@ -334,6 +395,14 @@ export default function MediaPanel() {
           <Upload size={32} />
           <p>Upload videos or images to get started</p>
         </div>
+      )}
+
+      {showRecorder && (
+        <ScreenRecorderPiP
+          addVideo={addVideo}
+          onClose={() => setShowRecorder(false)}
+          onRecordingChange={handleRecordingChange}
+        />
       )}
     </div>
   );
