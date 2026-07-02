@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useState } from 'react';
+import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { useVideo } from '../context/VideoContext';
 import { Upload, Video, Image as ImageIcon, Monitor, Trash2, Plus, Square, Download } from 'lucide-react';
 import ScreenRecorderPiP from './ScreenRecorderPiP';
@@ -211,6 +211,34 @@ export default function MediaPanel() {
       stopRef.current();
     }
   }, []);
+
+  // Handle paste: extract images from clipboard and add to media library
+  const handlePaste = useCallback((e) => {
+    const items = e.clipboardData.items;
+    const imageFiles = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          // Rename with a timestamp for clarity
+          const ts = new Date().toISOString().replace(/[:.]/g, '-');
+          const renamed = new File([file], `Pasted Image ${ts}.png`, { type: file.type });
+          imageFiles.push(renamed);
+        }
+      }
+    }
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      processFiles(imageFiles);
+    }
+  }, [processFiles]);
+
+  // Add paste listener on mount
+  useEffect(() => {
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, [handlePaste]);
 
   const handleDownloadVideo = useCallback((video) => {
     const a = document.createElement('a');
