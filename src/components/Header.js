@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useVideo } from '../context/VideoContext';
 import {
   MousePointer2,
@@ -24,13 +24,21 @@ const tools = [
 export default function Header() {
   const { state, setTool, setExporting } = useVideo();
 
-  const handleExport = () => {
+  const handleExportWebM = useCallback(() => {
     if (state.isExporting) {
       setExporting(false, 0);
     } else {
-      setExporting(true, 0);
+      setExporting(true, 0, 'webm');
     }
-  };
+  }, [state.isExporting, setExporting]);
+
+  const handleExportMp4 = useCallback(() => {
+    if (state.isExporting) {
+      setExporting(false, 0);
+    } else {
+      setExporting(true, 0, 'mp4');
+    }
+  }, [state.isExporting, setExporting]);
 
   return (
     <header className="header">
@@ -53,23 +61,35 @@ export default function Header() {
           ))}
         </div>
         <div className="header-actions">
-          <button
-            className={`action-btn export-btn ${state.isExporting ? 'exporting' : ''}`}
-            onClick={handleExport}
-            title={state.isExporting ? 'Cancel Export' : 'Export Video'}
-          >
-            {state.isExporting ? (
-              <>
-                <span className="export-spinner" />
-                <span>{state.exportProgress}%</span>
-              </>
-            ) : (
-              <>
+          {state.isExporting ? (
+            <button
+              className="action-btn export-btn exporting"
+              onClick={() => setExporting(false, 0)}
+              title="Cancel Export"
+            >
+              <span className="export-spinner" />
+              <span>{state.exportProgress > 100 ? '💿 MP4…' : `${state.exportProgress}%`}</span>
+            </button>
+          ) : (
+            <>
+              <button
+                className="action-btn export-btn"
+                onClick={handleExportWebM}
+                title="Export as WebM (fast, VP9 codec)"
+              >
                 <Save size={16} />
-                <span>Export</span>
-              </>
-            )}
-          </button>
+                <span>WebM</span>
+              </button>
+              <button
+                className="action-btn export-btn"
+                onClick={handleExportMp4}
+                title="Export as MP4 (converted in browser, H.264 codec)"
+              >
+                <Save size={16} />
+                <span>MP4</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
     </header>

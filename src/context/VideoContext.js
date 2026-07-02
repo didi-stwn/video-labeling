@@ -18,6 +18,7 @@ const initialState = {
   nextId: 1,
   isExporting: false,
   exportProgress: 0,
+  exportFormat: null, // 'webm' | 'mp4'
 };
 
 let clipIdCounter = 1;
@@ -181,7 +182,13 @@ function reducer(state, action) {
     }
 
     case 'SET_EXPORTING': {
-      return { ...state, isExporting: action.payload.isExporting, exportProgress: action.payload.progress ?? 0 };
+      return {
+        ...state,
+        isExporting: action.payload.isExporting,
+        exportProgress: action.payload.progress ?? 0,
+        // Only override format when explicitly provided (not undefined/null)
+        exportFormat: action.payload.format != null ? action.payload.format : state.exportFormat,
+      };
     }
 
     case 'SET_CURRENT_TIME': {
@@ -477,7 +484,8 @@ export function VideoProvider({ children }) {
   );
 
   const setExporting = useCallback(
-    (isExporting, progress) => dispatch({ type: 'SET_EXPORTING', payload: { isExporting, progress } }),
+    (isExporting, progress, format = null) =>
+      dispatch({ type: 'SET_EXPORTING', payload: { isExporting, progress, format } }),
     []
   );
 

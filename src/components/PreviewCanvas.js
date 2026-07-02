@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useVideo } from '../context/VideoContext';
+import { webmToMp4 } from '../utils/ffmpeg';
 
 const HANDLE_SIZE = 8;
 const ROTATE_HANDLE_OFFSET = 28;
@@ -21,7 +22,7 @@ export default function PreviewCanvas() {
   const videoRefs = useRef({});
   const animFrameRef = useRef(null);
   const drawRafRef = useRef(null);
-  const exportResRef = useRef(null); // overrides canvas resolution during export
+  const exportResRef = useRef(null); // sets canvas size during export
   const [containerSize, setContainerSize] = useState({ width: 640, height: 360 });
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStart, setDrawStart] = useState({ x: 0, y: 0 });
@@ -140,6 +141,7 @@ export default function PreviewCanvas() {
   // Export: uses natural playback (videos play at 1× speed — no per-frame seeking).
   // The canvas draw loop renders whatever frames the video decoder has ready, and
   // canvas.captureStream() records them at 30fps with zero flicker.
+  // The export canvas size matches the preview container, so what you see is what you get.
   useEffect(() => {
     if (!state.isExporting) return;
     const canvas = canvasRef.current;
@@ -155,15 +157,18 @@ export default function PreviewCanvas() {
     const fps = 30;
     const duration = state.duration;
 
-    // Determine target export resolution from source videos
+    // Export at native resolution of the first video clip — this determines
+    // both the canvas pixel size and aspect ratio for the entire export.
+    // Any subsequent clips with different aspect ratios are centered within
+    // this frame (handled by the per-clip letterboxing in the draw loop).
     const videoEntries = Object.values(videoRefs.current);
     const firstVideo = videoEntries.find(e => e.videoEl && e.videoEl.videoWidth > 0);
     const targetW = firstVideo ? firstVideo.videoEl.videoWidth : 1920;
     const targetH = firstVideo ? firstVideo.videoEl.videoHeight : 1080;
     const pixels = targetW * targetH;
-    // Bitrate scales with resolution: ~8 bps per pixel, clamped 8–50 Mbps
-    const bitrate = Math.max(8000000, Math.min(50000000, Math.round(pixels * 8)));
-    // Set export resolution ref so the draw loop resizes canvas to native res
+    // Higher bitrate preserves more detail: ~15 bps per pixel, clamped 10–80 Mbps
+    const bitrate = Math.max(10000000, Math.min(80000000, Math.round(pixels * 15)));
+    // Lock canvas to native resolution so the draw loop renders at full quality
     exportResRef.current = { width: targetW, height: targetH };
 
     // Seek all videos to their clip start positions, then start natural playback
@@ -221,17 +226,49 @@ export default function PreviewCanvas() {
         recorder.ondataavailable = (e) => {
           if (e.data.size > 0) chunks.push(e.data);
         };
-        recorder.onstop = () => {
+        recorder.onstop = async () => {
           if (cancelled) return;
           setIsPlaying(false);
-          const blob = new Blob(chunks, { type: 'video/webm' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'exported-video.webm';
-          a.click();
-          URL.revokeObjectURL(url);
-          setExporting(false, 100);
+
+          const webmBlob = new Blob(chunks, { type: 'video/webm' });
+          // Read from stateRef (always fresh) to avoid stale closure
+          const fmt = stateRef.current.exportFormat;
+
+          if (fmt === 'mp4') {
+            // Transcode WebM → MP4 client-side using FFmpeg.wasm
+            try {
+              setExporting(true, 101, 'mp4'); // 101 = "Converting to MP4…" signal
+              const mp4Blob = await webmToMp4(webmBlob, fps);
+              if (cancelled) return;
+              const url = URL.createObjectURL(mp4Blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'exported-video.mp4';
+              a.click();
+              URL.revokeObjectURL(url);
+            } catch (err) {
+              // Fallback: download original WebM if transcoding fails
+              console.error('MP4 conversion failed, falling back to WebM:', err);
+              if (!cancelled) {
+                const url = URL.createObjectURL(webmBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'exported-video.webm';
+                a.click();
+                URL.revokeObjectURL(url);
+              }
+            }
+          } else {
+            // WebM: direct download, no transcoding
+            const url = URL.createObjectURL(webmBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'exported-video.webm';
+            a.click();
+            URL.revokeObjectURL(url);
+          }
+
+          if (!cancelled) setExporting(false, 100);
         };
 
         recorder.start();
@@ -272,10 +309,9 @@ export default function PreviewCanvas() {
   }, [state.isExporting]);
 
   // --- Layout helpers ---
-  const getLayout = (cw, ch) => {
+  const getLayout = (cw, ch, aspect = 16 / 9) => {
     const w = cw || 640;
     const h = ch || 360;
-    const aspect = 16 / 9;
     let pw, ph, ox, oy;
     if (w / h > aspect) {
       ph = h;
@@ -308,11 +344,24 @@ export default function PreviewCanvas() {
       const { isDrawing: id, drawStart: ds, drawCurrent: dc } = drawStateRef.current;
       const { width: cw, height: ch } = containerSizeRef.current;
       const ctx = canvas.getContext('2d');
-      // During export, override canvas resolution to match source video for full quality
+
+      // During export the canvas uses the higher-resolution snapshot so the
+      // output quality matches the source video.
       const er = exportResRef.current;
       const layoutW = er ? er.width : cw;
       const layoutH = er ? er.height : ch;
-      const { w, h, pw, ph, ox, oy } = getLayout(layoutW, layoutH);
+
+      // Preview-area aspect matches the first video clip's native ratio.
+      // Every video on the timeline gets letterboxed/pillarboxed within this
+      // frame, so the export aspect ratio is consistent regardless of clip mix.
+      const firstEntry = Object.values(videoRefs.current).find(
+        e => e.videoEl && e.videoEl.videoWidth > 0
+      );
+      const layoutAspect = firstEntry
+        ? firstEntry.videoEl.videoWidth / firstEntry.videoEl.videoHeight
+        : 16 / 9;
+
+      const { w, h, pw, ph, ox, oy } = getLayout(layoutW, layoutH, layoutAspect);
 
       // Resize canvas if needed
       if (canvas.width !== w || canvas.height !== h) {
@@ -336,12 +385,6 @@ export default function PreviewCanvas() {
           const entry = videoRefs.current[clip.id];
           const video = entry?.videoEl;
           if (!video || video.readyState < 2) return;
-
-          // Log once per clip for debugging
-          if (!video._logged) {
-            console.log(`[Video] rendering clip "${clip.name}" readyState=${video.readyState} size=${video.videoWidth}x${video.videoHeight} currentTime=${video.currentTime.toFixed(2)}`);
-            video._logged = true;
-          }
 
           const vAspect = (video.videoWidth || 1920) / (video.videoHeight || 1080);
           const pAspect = pw / ph;
