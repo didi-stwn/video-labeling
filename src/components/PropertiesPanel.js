@@ -413,6 +413,33 @@ export default function PropertiesPanel() {
                 onChange={(e) => handleUpdate('name', e.target.value)}
               />
             </div>
+            <div className="prop-field prop-speed-field">
+              <label>Speed</label>
+              <div className="prop-speed-row">
+                <input
+                  type="range"
+                  min={0.25}
+                  max={4}
+                  step={0.05}
+                  value={element.playbackRate ?? 1}
+                  onChange={(e) => debouncedUpdate('playbackRate', Number(e.target.value), 80)}
+                />
+                <span className="prop-range-value prop-speed-value">
+                  {(element.playbackRate ?? 1).toFixed(2)}×
+                </span>
+              </div>
+              <div className="prop-speed-presets">
+                {[0.25, 0.5, 1, 1.5, 2, 3, 4].map((rate) => (
+                  <button
+                    key={rate}
+                    className={`prop-speed-preset-btn ${(element.playbackRate ?? 1) === rate ? 'active' : ''}`}
+                    onClick={() => handleUpdate('playbackRate', rate)}
+                  >
+                    {rate}×
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 

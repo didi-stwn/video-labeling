@@ -139,6 +139,7 @@ export default function MediaPanel() {
         opacity: 1,
         rotation: 0,
         lockAspectRatio: true,
+        playbackRate: 1,
       });
     },
     [state.tracks, state.duration, state.currentTime, addClipToTrack]
@@ -164,6 +165,7 @@ export default function MediaPanel() {
           y: 0,
           width: video.width || 1920,
           height: video.height || 1080,
+          playbackRate: 1,
         });
       }
     },

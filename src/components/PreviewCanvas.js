@@ -89,6 +89,11 @@ export default function PreviewCanvas() {
       const inRange = s.currentTime >= clip.startTime && s.currentTime <= clip.endTime;
 
       if (playing && inRange) {
+        // Apply playback rate from clip properties (can change via user editing)
+        const rate = clip.playbackRate || 1;
+        if (videoEl.playbackRate !== rate) {
+          videoEl.playbackRate = rate;
+        }
         // Should be playing naturally — start it if it's not already
         if (videoEl.paused) {
           const rel = s.currentTime - clip.startTime;
