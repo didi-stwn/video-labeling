@@ -145,6 +145,33 @@ function reducer(state, action) {
       };
     }
 
+    case 'DUPLICATE_CLIP': {
+      const { clipId, trackId } = action.payload;
+      let originalClip = null;
+      state.tracks.forEach((track) => {
+        const found = track.clips.find((c) => c.id === clipId);
+        if (found) originalClip = { ...found };
+      });
+      if (!originalClip) return state;
+      const dup = {
+        ...originalClip,
+        id: generateId(),
+        startTime: originalClip.startTime,
+        endTime: originalClip.endTime,
+        x: (originalClip.x || 50) + 2,
+        y: (originalClip.y || 50) + 2,
+      };
+      return {
+        ...state,
+        tracks: state.tracks.map((track) =>
+          track.id === (trackId || originalClip.trackId)
+            ? { ...track, clips: [...track.clips, dup] }
+            : track
+        ),
+        selectedElementId: dup.id,
+      };
+    }
+
     case 'DELETE_VIDEO': {
       const { videoId } = action.payload;
       return {
@@ -566,6 +593,15 @@ export function VideoProvider({ children }) {
     []
   );
 
+  const duplicateClip = useCallback(
+    (clipId, trackId) =>
+      dispatch({
+        type: 'DUPLICATE_CLIP',
+        payload: { clipId, trackId },
+      }),
+    []
+  );
+
   const getSelectedElement = useCallback(() => {
     if (!state.selectedElementId) return null;
     for (const track of state.tracks) {
@@ -604,6 +640,7 @@ export function VideoProvider({ children }) {
     splitClip,
     trimClipStart,
     trimClipEnd,
+    duplicateClip,
     getSelectedElement,
     setExporting,
   };

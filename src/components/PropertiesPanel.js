@@ -1,6 +1,6 @@
 import React, { useCallback, useRef } from 'react';
 import { useVideo } from '../context/VideoContext';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Copy } from 'lucide-react';
 
 export default function PropertiesPanel() {
   const {
@@ -8,6 +8,7 @@ export default function PropertiesPanel() {
     getSelectedElement,
     updateClip,
     deleteClip,
+    duplicateClip,
     // selectElement,
     // deselectAll,
   } = useVideo();
@@ -118,6 +119,13 @@ export default function PropertiesPanel() {
               {element.type.charAt(0).toUpperCase() + element.type.slice(1)}
             </span>
             <div className="prop-header-actions">
+              <button
+                className="prop-action-btn"
+                onClick={() => duplicateClip(element.id, elementTrack?.id)}
+                title="Duplicate"
+              >
+                <Copy size={14} />
+              </button>
               <button
                 className="prop-action-btn danger"
                 onClick={() => deleteClip(element.id)}
