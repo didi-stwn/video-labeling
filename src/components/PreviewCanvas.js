@@ -359,6 +359,12 @@ export default function PreviewCanvas() {
       const layoutW = er ? er.width : cw;
       const layoutH = er ? er.height : ch;
 
+      // Scale factor for absolute pixel values (stroke width, font size, etc.)
+      // so shapes look identical at any canvas resolution.
+      // During preview (er === null): canvas.width ≈ container width → scale = 1
+      // During export: canvas.width = native video width (e.g., 1920px) → scale > 1
+      const pxScale = er ? (layoutW / Math.max(containerSizeRef.current.width, 1)) : 1;
+
       // Preview-area aspect matches the first video clip's native ratio.
       // Every video on the timeline gets letterboxed/pillarboxed within this
       // frame, so the export aspect ratio is consistent regardless of clip mix.
@@ -437,7 +443,7 @@ export default function PreviewCanvas() {
           switch (clip.type) {
             case 'rect':
               ctx.strokeStyle = clip.strokeColor || '#ff0000';
-              ctx.lineWidth = clip.strokeWidth || 2;
+              ctx.lineWidth = (clip.strokeWidth || 2) * pxScale;
               if (isFill) ctx.fillStyle = clip.fillColor || 'rgba(255,0,0,0.2)';
               if (clip.borderRadius > 0) {
                 roundRect(ctx, cx, cy, cw2, ch2, (clip.borderRadius / 20) * Math.min(cw2, ch2));
@@ -448,7 +454,7 @@ export default function PreviewCanvas() {
               break;
             case 'circle':
               ctx.strokeStyle = clip.strokeColor || '#ff0000';
-              ctx.lineWidth = clip.strokeWidth || 2;
+              ctx.lineWidth = (clip.strokeWidth || 2) * pxScale;
               ctx.beginPath();
               ctx.ellipse(cx + cw2 / 2, cy + ch2 / 2, cw2 / 2, ch2 / 2, 0, 0, Math.PI * 2);
               if (isFill) { ctx.fillStyle = clip.fillColor || 'rgba(255,0,0,0.2)'; ctx.fill(); }
@@ -456,7 +462,7 @@ export default function PreviewCanvas() {
               break;
             case 'triangle':
               ctx.strokeStyle = clip.strokeColor || '#ff0000';
-              ctx.lineWidth = clip.strokeWidth || 2;
+              ctx.lineWidth = (clip.strokeWidth || 2) * pxScale;
               ctx.beginPath();
               ctx.moveTo(cx + cw2 / 2, cy);
               ctx.lineTo(cx + cw2, cy + ch2);
@@ -482,14 +488,14 @@ export default function PreviewCanvas() {
                 by = cy + (dy < 0 ? 0 : ch2);
               }
               ctx.strokeStyle = clip.strokeColor || '#ff0000';
-              ctx.lineWidth = clip.strokeWidth || 2;
+              ctx.lineWidth = (clip.strokeWidth || 2) * pxScale;
               ctx.fillStyle = clip.strokeColor || '#ff0000';
               ctx.beginPath();
               ctx.moveTo(ax, ay);
               ctx.lineTo(bx, by);
               ctx.stroke();
               const ang = Math.atan2((by - ay), (bx - ax));
-              const hl = Math.max(8, Math.hypot(bx - ax, by - ay) * 0.12);
+              const hl = Math.max(8 * pxScale, Math.hypot(bx - ax, by - ay) * 0.12);
               ctx.beginPath();
               ctx.moveTo(bx, by);
               ctx.lineTo(bx - hl * Math.cos(ang - Math.PI / 6), by - hl * Math.sin(ang - Math.PI / 6));
@@ -515,7 +521,7 @@ export default function PreviewCanvas() {
                 by = cy + (dy < 0 ? 0 : ch2);
               }
               ctx.strokeStyle = clip.strokeColor || '#ff0000';
-              ctx.lineWidth = clip.strokeWidth || 2;
+              ctx.lineWidth = (clip.strokeWidth || 2) * pxScale;
               ctx.beginPath();
               ctx.moveTo(ax, ay);
               ctx.lineTo(bx, by);
@@ -524,8 +530,8 @@ export default function PreviewCanvas() {
             }
             case 'text':
               ctx.fillStyle = clip.color || '#ffffff';
-              ctx.font = `${clip.fontSize || 24}px ${clip.fontFamily || 'Arial'}`;
-              ctx.fillText(clip.text || 'Text', cx, cy + (clip.fontSize || 24));
+              ctx.font = `${(clip.fontSize || 24) * pxScale}px ${clip.fontFamily || 'Arial'}`;
+              ctx.fillText(clip.text || 'Text', cx, cy + (clip.fontSize || 24) * pxScale);
               break;
             case 'image':
               const imgEl = document.getElementById(`overlay-img-${clip.id}`);
@@ -556,8 +562,8 @@ export default function PreviewCanvas() {
 
           ctx.restore();
 
-          // === Selection handles ===
-          if (clip.id === s.selectedElementId) {
+          // === Selection handles (hidden during export) ===
+          if (!er && clip.id === s.selectedElementId) {
             const pad = 4;
             const sx = cx - pad;
             const sy = cy - pad;
