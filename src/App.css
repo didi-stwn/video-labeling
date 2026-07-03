@@ -306,6 +306,10 @@ textarea:focus {
   font-weight: 600;
 }
 
+.rec-btn{
+  width: 100%;
+}
+
 .upload-btn.rec-btn {
   border-style: solid;
   border-color: var(--danger);
@@ -362,6 +366,237 @@ textarea:focus {
   letter-spacing: 1px;
   min-width: 40px;
   text-align: center;
+}
+
+/* ===== Record Screen Popover ===== */
+.rec-btn-wrapper {
+  position: relative;
+}
+
+.rec-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  z-index: 100;
+  overflow: hidden;
+  animation: rec-popover-in 0.15s ease-out;
+}
+
+@keyframes rec-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rec-popover-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.rec-popover-btn:hover {
+  background: var(--bg-hover);
+}
+
+.rec-popover-btn + .rec-popover-btn {
+  border-top: 1px solid var(--border-color);
+}
+
+.rec-popover-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-dim);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.rec-popover-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.rec-popover-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* ===== Direct Recorder (in-page overlay) ===== */
+.direct-recorder-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  animation: dr-fade-in 0.2s ease-out;
+}
+
+@keyframes dr-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.direct-recorder-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px 40px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  min-width: 200px;
+}
+
+.direct-recorder-card.recording {
+  background: #1a1a1a;
+  color: #fff;
+  border: 2px solid var(--danger);
+}
+
+.direct-recorder-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(66, 99, 235, 0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: dr-spin 0.7s linear infinite;
+}
+
+@keyframes dr-spin {
+  to { transform: rotate(360deg); }
+}
+
+.direct-recorder-text {
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.direct-recorder-stop-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 28px;
+  border: none;
+  border-radius: 40px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: background var(--transition);
+  font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+}
+
+.direct-recorder-stop-btn:hover {
+  background: var(--danger-hover);
+}
+
+.direct-recorder-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  animation: dr-blink 1s ease-in-out infinite;
+}
+
+@keyframes dr-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.direct-recorder-timer {
+  font-size: 22px;
+  min-width: 60px;
+  text-align: center;
+}
+
+.direct-recorder-stop-icon {
+  font-size: 18px;
+}
+
+.direct-recorder-saved-icon {
+  font-size: 32px;
+}
+
+.direct-recorder-icon {
+  color: var(--danger);
+  opacity: 0.8;
+}
+
+.direct-recorder-start-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 28px;
+  border: none;
+  border-radius: 40px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition);
+  min-width: 180px;
+}
+
+.direct-recorder-start-btn:hover {
+  background: var(--danger-hover);
+}
+
+.rec-dot-inline {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.direct-recorder-cancel-btn {
+  padding: 6px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.direct-recorder-cancel-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .export-spinner {
@@ -1027,16 +1262,11 @@ textarea:focus {
   top: 4px;
   height: calc(100% - 8px);
   border-radius: var(--radius-sm);
-  cursor: grab;
   overflow: visible;
   transition: box-shadow var(--transition);
   display: flex;
   align-items: center;
   user-select: none;
-}
-
-.timeline-clip:active {
-  cursor: grabbing;
 }
 
 .timeline-clip.selected {
@@ -1067,10 +1297,31 @@ textarea:focus {
 .clip-edge {
   position: absolute;
   top: 0;
-  width: 6px;
+  width: 8px;
   height: 100%;
   cursor: col-resize;
   z-index: 2;
+  transition: background var(--transition);
+}
+
+.clip-edge::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 2px;
+  width: 2px;
+  border-radius: 1px;
+  background: rgba(0, 0, 0, 0.15);
+  transition: background var(--transition);
+}
+
+.clip-edge:hover::after {
+  background: var(--accent);
+}
+
+.clip-edge:hover {
+  background: rgba(66, 99, 235, 0.08);
 }
 
 .clip-edge-left {
@@ -1089,6 +1340,11 @@ textarea:focus {
   width: 100%;
   min-width: 0;
   gap: 4px;
+  cursor: grab;
+}
+
+.clip-content:active {
+  cursor: grabbing;
 }
 
 .clip-label {
@@ -1121,7 +1377,7 @@ textarea:focus {
   border: 1px solid var(--border-color);
   z-index: 10;
   pointer-events: auto;
-  margin-right: 4px;
+  margin-right: 15px;
 }
 
 .clip-action-btn {

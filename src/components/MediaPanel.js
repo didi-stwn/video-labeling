@@ -1,7 +1,8 @@
 import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { useVideo } from '../context/VideoContext';
-import { Upload, Video, Image as ImageIcon, Monitor, Trash2, Plus, Square, Download } from 'lucide-react';
+import { Upload, Video, Image as ImageIcon, Monitor, Trash2, Plus, Square, Download, Pipette, Camera } from 'lucide-react';
 import ScreenRecorderPiP from './ScreenRecorderPiP';
+import DirectRecorder from './DirectRecorder';
 
 export default function MediaPanel() {
   const { state, addVideo, addImage, deleteVideo, deleteImage, addClipToTrack } =
@@ -11,8 +12,11 @@ export default function MediaPanel() {
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounter = useRef(0);
   const [showRecorder, setShowRecorder] = useState(false);
+  const [recorderMode, setRecorderMode] = useState(null); // 'pip' | 'direct'
+  const [showRecorderPopover, setShowRecorderPopover] = useState(false);
   const [recordingState, setRecordingState] = useState({ isRecording: false, seconds: 0, stop: null });
   const stopRef = useRef(null);
+  const popoverRef = useRef(null);
 
   // Shared: process a list of File objects (from input change or drop)
   const processFiles = useCallback(
@@ -113,7 +117,7 @@ export default function MediaPanel() {
     (video) => {
       const overlayTrack = state.tracks.find((t) => t.type === 'overlay');
       if (!overlayTrack) return;
-      const clipDuration = Math.min(video.duration, state.duration);
+      const clipDuration = video.duration;
       // Calculate initial overlay size preserving source aspect ratio.
       // Overlay coords are % of the preview area (16:9), so a square % results in
       // a 16:9 rendered rect. We must compensate so the source video looks unstretched.
@@ -129,7 +133,7 @@ export default function MediaPanel() {
         videoId: video.id,
         videoUrl: video.url,
         startTime: state.currentTime,
-        endTime: Math.min(state.duration, state.currentTime + clipDuration),
+        endTime: state.currentTime + clipDuration,
         sourceStart: 0,
         sourceEnd: clipDuration,
         x: 20,
@@ -142,7 +146,7 @@ export default function MediaPanel() {
         playbackRate: 1,
       });
     },
-    [state.tracks, state.duration, state.currentTime, addClipToTrack]
+    [state.tracks, state.currentTime, addClipToTrack]
   );
 
   const handleAddVideoToTrack = useCallback(
@@ -151,7 +155,7 @@ export default function MediaPanel() {
       const videoTracks = state.tracks.filter((t) => t.type === 'video');
       const videoTrack = videoTracks[videoTracks.length - 1];
       if (videoTrack) {
-        const clipDuration = Math.min(video.duration, state.duration);
+        const clipDuration = video.duration;
         addClipToTrack(videoTrack.id, {
           type: 'video',
           name: video.name,
@@ -169,7 +173,7 @@ export default function MediaPanel() {
         });
       }
     },
-    [state.tracks, state.duration, addClipToTrack]
+    [state.tracks, addClipToTrack]
   );
 
   const handleAddImageToTrack = useCallback(
@@ -213,6 +217,38 @@ export default function MediaPanel() {
       stopRef.current();
     }
   }, []);
+
+  const handleRecordScreenClick = useCallback(() => {
+    setShowRecorderPopover(true);
+  }, []);
+
+  const handlePopoverPiP = useCallback(() => {
+    setShowRecorderPopover(false);
+    setRecorderMode('pip');
+    setShowRecorder(true);
+  }, []);
+
+  const handlePopoverDirect = useCallback(() => {
+    setShowRecorderPopover(false);
+    setRecorderMode('direct');
+    setShowRecorder(true);
+  }, []);
+
+  // Close popover on outside click
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target)) {
+        setShowRecorderPopover(false);
+      }
+    };
+    if (showRecorderPopover) {
+      // Delay adding listener so the click that opened it doesn't close it
+      requestAnimationFrame(() => {
+        document.addEventListener('mousedown', handleClick);
+      });
+    }
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showRecorderPopover]);
 
   // Handle paste: extract images from clipboard and add to media library
   const handlePaste = useCallback((e) => {
@@ -293,14 +329,48 @@ export default function MediaPanel() {
               <Square size={12} />
             </button>
           ) : (
-            <button
-              className="upload-btn rec-btn"
-              onClick={() => setShowRecorder(true)}
-              title="Record Screen"
-            >
-              <Monitor size={14} />
-              <span>Record Screen</span>
-            </button>
+            <div className="rec-btn-wrapper" ref={popoverRef}>
+              <button
+                className="upload-btn rec-btn"
+                onClick={handleRecordScreenClick}
+                title="Record Screen"
+              >
+                <Monitor size={14} />
+                <span>Record Screen</span>
+              </button>
+              {showRecorderPopover && (
+                <div className="rec-popover">
+                  <button
+                    className="rec-popover-btn"
+                    onClick={handlePopoverPiP}
+                  >
+                    <span className="rec-popover-icon">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                        <line x1="8" y1="21" x2="16" y2="21"/>
+                        <line x1="12" y1="17" x2="12" y2="21"/>
+                        <rect x="10" y="7" width="6" height="4" rx="1"/>
+                      </svg>
+                    </span>
+                    <span className="rec-popover-label">Open PiP</span>
+                    <span className="rec-popover-desc">Record in a floating window</span>
+                  </button>
+                  <button
+                    className="rec-popover-btn"
+                    onClick={handlePopoverDirect}
+                  >
+                    <span className="rec-popover-icon">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <circle cx="12" cy="12" r="3" fill="currentColor"/>
+                      </svg>
+                    </span>
+                    <span className="rec-popover-label">Record Now</span>
+                    <span className="rec-popover-desc">Record directly in the app</span>
+                  </button>
+                </div>
+              )}
+            </div>
           )}
 
           <input
@@ -427,10 +497,18 @@ export default function MediaPanel() {
         </div>
       )}
 
-      {showRecorder && (
+      {showRecorder && recorderMode === 'pip' && (
         <ScreenRecorderPiP
           addVideo={addVideo}
-          onClose={() => setShowRecorder(false)}
+          onClose={() => { setShowRecorder(false); setRecorderMode(null); }}
+          onRecordingChange={handleRecordingChange}
+        />
+      )}
+
+      {showRecorder && recorderMode === 'direct' && (
+        <DirectRecorder
+          addVideo={addVideo}
+          onClose={() => { setShowRecorder(false); setRecorderMode(null); }}
           onRecordingChange={handleRecordingChange}
         />
       )}

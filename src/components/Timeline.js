@@ -23,7 +23,7 @@ export default function Timeline() {
     selectElement,
     updateClip,
     deleteClip,
-    deselectAll,
+    // deselectAll,
     addTrack,
     removeTrack,
     toggleTrackCollapse,
@@ -112,7 +112,7 @@ export default function Timeline() {
       if (draggingClip) {
         const overTrackId = trackDragOver;
         if (overTrackId && overTrackId !== draggingClip.trackId) {
-          const duration = draggingClip.clipEnd - draggingClip.clipStart;
+          // const duration = draggingClip.clipEnd - draggingClip.clipStart;
           const newStartTime = draggingClip.clipStart;
           moveClipToTrack(draggingClip.clipId, draggingClip.trackId, overTrackId, newStartTime);
         }
@@ -148,30 +148,25 @@ export default function Timeline() {
       selectElement(clip.id);
       setCurrentTime(clip.startTime);
 
-      const rect = e.currentTarget.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clipWidth = rect.width;
-      const edgeThreshold = 8;
-
-      if (e.shiftKey && clickX < edgeThreshold) {
-        setTrimEdge({ clipId: clip.id, trackId, edge: 'start' });
-      } else if (e.shiftKey && clickX > clipWidth - edgeThreshold) {
-        setTrimEdge({ clipId: clip.id, trackId, edge: 'end' });
-      } else {
-        const srcTrack = state.tracks.find(t => t.id === trackId);
-        setDraggingClip({
-          clipId: clip.id,
-          trackId,
-          trackType: srcTrack?.type || 'overlay',
-          startX: e.clientX,
-          clipStart: clip.startTime,
-          clipEnd: clip.endTime,
-          didMove: false,
-        });
-      }
+      const srcTrack = state.tracks.find(t => t.id === trackId);
+      setDraggingClip({
+        clipId: clip.id,
+        trackId,
+        trackType: srcTrack?.type || 'overlay',
+        startX: e.clientX,
+        clipStart: clip.startTime,
+        clipEnd: clip.endTime,
+        didMove: false,
+      });
     },
-    [selectElement, setCurrentTime]
+    [selectElement, setCurrentTime, state.tracks]
   );
+
+  const handleEdgeMouseDown = useCallback((e, clipId, trackId, edge) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setTrimEdge({ clipId, trackId, edge });
+  }, []);
 
   // Get which track row the mouse Y is over for cross-track dragging (same-type only)
   const getTrackIdAtY = useCallback((clientY, allowedType) => {
@@ -367,7 +362,7 @@ export default function Timeline() {
         <div className="timeline-transport">
           <button
             className="transport-btn"
-            onClick={() => setCurrentTime(Math.max(0, state.currentTime - 1))}
+            onClick={() => setCurrentTime(Math.max(0, state.currentTime - 5))}
             title="Skip Back"
           >
             <SkipBack size={14} />
@@ -382,7 +377,7 @@ export default function Timeline() {
           <button
             className="transport-btn"
             onClick={() =>
-              setCurrentTime(Math.min(state.duration, state.currentTime + 1))
+              setCurrentTime(Math.min(state.duration, state.currentTime + 5))
             }
             title="Skip Forward"
           >
@@ -557,7 +552,11 @@ export default function Timeline() {
                         ),
                       }}
                     >
-                      <div className="clip-edge clip-edge-left" title="Shift+drag to trim start" />
+                      <div
+                        className="clip-edge clip-edge-left"
+                        onMouseDown={(e) => handleEdgeMouseDown(e, clip.id, track.id, 'start')}
+                        title="Drag to trim start"
+                      />
                       <div className="clip-content"
                         onMouseDown={(e) => handleClipMouseDown(e, clip, track.id)}
                         onClick={(e) => e.stopPropagation()}
@@ -584,7 +583,11 @@ export default function Timeline() {
                           {(clip.endTime - clip.startTime).toFixed(1)}s
                         </span>
                       </div>
-                      <div className="clip-edge clip-edge-right" title="Shift+drag to trim end" />
+                      <div
+                        className="clip-edge clip-edge-right"
+                        onMouseDown={(e) => handleEdgeMouseDown(e, clip.id, track.id, 'end')}
+                        title="Drag to trim end"
+                      />
                       {clip.id === state.selectedElementId && (
                         <div className="clip-actions">
                           <button

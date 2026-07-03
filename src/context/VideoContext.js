@@ -349,13 +349,21 @@ function reducer(state, action) {
               ...track,
               clips: track.clips.map((clip) => {
                 if (clip.id === clipId && newStartTime < clip.endTime) {
+                  // For video clips, use the original source video duration as the absolute cap
+                  // so the user can always trim back to full length.
+                  const timeScale = clip.playbackRate || 1;
+                  const srcVideo = state.videos.find(v => v.id === clip.videoId);
+                  const originalDuration = srcVideo ? srcVideo.duration : (clip.sourceEnd - clip.sourceStart);
+                  const maxTimelineDuration = originalDuration / timeScale;
+                  const minStart = Math.max(0, clip.endTime - maxTimelineDuration);
+                  const cappedStart = clip.type === 'video' ? Math.max(newStartTime, minStart) : newStartTime;
+                  if (cappedStart >= clip.endTime) return clip;
                   const duration = clip.sourceEnd - clip.sourceStart;
                   const totalDuration = clip.endTime - clip.startTime;
-                  const ratio =
-                    (newStartTime - clip.startTime) / totalDuration;
+                  const ratio = (cappedStart - clip.startTime) / totalDuration;
                   return {
                     ...clip,
-                    startTime: newStartTime,
+                    startTime: cappedStart,
                     sourceStart: clip.sourceStart + duration * ratio,
                   };
                 }
@@ -378,12 +386,20 @@ function reducer(state, action) {
               ...track,
               clips: track.clips.map((clip) => {
                 if (clip.id === clipId && newEndTime > clip.startTime) {
+                  // For video clips, use the original source video duration as the absolute cap
+                  // so the user can always trim back to full length.
+                  const timeScale = clip.playbackRate || 1;
+                  const srcVideo = state.videos.find(v => v.id === clip.videoId);
+                  const originalDuration = srcVideo ? srcVideo.duration : (clip.sourceEnd - clip.sourceStart);
+                  const maxTimelineDuration = originalDuration / timeScale;
+                  const maxEndTime = clip.startTime + maxTimelineDuration;
+                  const cappedEnd = clip.type === 'video' ? Math.min(newEndTime, maxEndTime) : newEndTime;
                   const duration = clip.sourceEnd - clip.sourceStart;
                   const totalDuration = clip.endTime - clip.startTime;
-                  const ratio = (newEndTime - clip.startTime) / totalDuration;
+                  const ratio = (cappedEnd - clip.startTime) / totalDuration;
                   return {
                     ...clip,
-                    endTime: newEndTime,
+                    endTime: cappedEnd,
                     sourceEnd: clip.sourceStart + duration * ratio,
                   };
                 }

@@ -97,15 +97,17 @@ export default function PreviewCanvas() {
         // Should be playing naturally — start it if it's not already
         if (videoEl.paused) {
           const rel = s.currentTime - clip.startTime;
-          const srcTime = clip.sourceStart + rel;
+          // Source time accounts for playback rate: e.g. at 2x speed, 1s on timeline = 2s in source
+          const srcTime = clip.sourceStart + rel * rate;
           // Only seek when NOT exporting — seekToStart() already pre-positioned
           // all videos before export capture began. Seeking during export would
           // invalidate the decoder buffer and cause flicker.
           if (!s.isExporting && Math.abs(videoEl.currentTime - srcTime) > 0.1) {
             videoEl.currentTime = srcTime;
           }
-          // Install auto-pause listener for clip end
-          const endSrcTime = clip.sourceStart + (clip.endTime - clip.startTime);
+          // Install auto-pause listener for clip end — use sourceEnd directly
+          // (already accounts for speed-adjusted duration)
+          const endSrcTime = clip.sourceEnd;
           const onTimeUpdate = () => {
             if (videoEl.currentTime >= endSrcTime) {
               videoEl.pause();
@@ -113,7 +115,7 @@ export default function PreviewCanvas() {
           };
           videoEl.addEventListener('timeupdate', onTimeUpdate);
           videoEl._onTimeUpdate = onTimeUpdate;
-          videoEl.play().catch(() => {});
+          videoEl.play().catch(() => { });
         }
       } else {
         // Should NOT be playing — pause and clean up
@@ -128,8 +130,9 @@ export default function PreviewCanvas() {
         // When paused (scrubbing), seek to the exact frame
         if (!playing) {
           const rel = s.currentTime - clip.startTime;
+          const rate = clip.playbackRate || 1;
           if (rel >= 0 && rel <= clip.endTime - clip.startTime) {
-            const srcTime = clip.sourceStart + rel;
+            const srcTime = clip.sourceStart + rel * rate;
             if (Math.abs(videoEl.currentTime - srcTime) > 0.15) {
               videoEl.currentTime = srcTime;
             }
@@ -403,7 +406,7 @@ export default function PreviewCanvas() {
             dx = ox;
             dy = oy - (dh - ph) / 2;
           }
-          try { ctx.drawImage(video, dx, dy, dw, dh); } catch (_) {}
+          try { ctx.drawImage(video, dx, dy, dw, dh); } catch (_) { }
         });
       });
 
@@ -547,6 +550,8 @@ export default function PreviewCanvas() {
               }
               break;
             }
+            default:
+              break;
           }
 
           ctx.restore();
@@ -651,6 +656,8 @@ export default function PreviewCanvas() {
             ctx.lineTo(dx2 + dw2, dy2 + dh2);
             ctx.stroke();
             break;
+          default:
+            break;
         }
         ctx.setLineDash([]);
         ctx.restore();
@@ -725,7 +732,7 @@ export default function PreviewCanvas() {
           hit = ptSegDistSq(pct.x, pct.y, ax, ay, bx, by) <= threshold * threshold;
         } else {
           hit = pct.x >= clip.x && pct.x <= clip.x + clip.width &&
-                pct.y >= clip.y && pct.y <= clip.y + clip.height;
+            pct.y >= clip.y && pct.y <= clip.y + clip.height;
         }
         if (hit) {
           found.push({ clip, trackId: track.id });
@@ -766,13 +773,13 @@ export default function PreviewCanvas() {
 
     const hList = [
       { id: 'nw', x: sx, y: sy },
-      { id: 'n',  x: sx + shw / 2, y: sy },
+      { id: 'n', x: sx + shw / 2, y: sy },
       { id: 'ne', x: sx + shw, y: sy },
-      { id: 'e',  x: sx + shw, y: sy + shh / 2 },
+      { id: 'e', x: sx + shw, y: sy + shh / 2 },
       { id: 'se', x: sx + shw, y: sy + shh },
-      { id: 's',  x: sx + shw / 2, y: sy + shh },
+      { id: 's', x: sx + shw / 2, y: sy + shh },
       { id: 'sw', x: sx, y: sy + shh },
-      { id: 'w',  x: sx, y: sy + shh / 2 },
+      { id: 'w', x: sx, y: sy + shh / 2 },
     ];
     for (const h of hList) {
       if (Math.hypot(tx - h.x, ty - h.y) <= HANDLE_SIZE + 4) return { type: 'resize', handleId: h.id };
@@ -880,7 +887,7 @@ export default function PreviewCanvas() {
         const ref = sc.type === 'video'
           ? state.videos.find(v => v.id === sc.videoId)
           : state.images.find(v => v.id === sc.imageId);
-        const mw = ref?.width  || 1920;
+        const mw = ref?.width || 1920;
         const mh = ref?.height || 1080;
         if (mw && mh) {
           const mediaAspect = mw / mh;

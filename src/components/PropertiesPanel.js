@@ -1,6 +1,6 @@
 import React, { useCallback, useRef } from 'react';
 import { useVideo } from '../context/VideoContext';
-import { Trash2, Copy, Lock } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 
 export default function PropertiesPanel() {
   const {
@@ -8,8 +8,8 @@ export default function PropertiesPanel() {
     getSelectedElement,
     updateClip,
     deleteClip,
-    selectElement,
-    deselectAll,
+    // selectElement,
+    // deselectAll,
   } = useVideo();
 
   const element = getSelectedElement();
@@ -52,6 +52,17 @@ export default function PropertiesPanel() {
       if (element) {
         updateClip(element.id, { [field]: value });
       }
+    },
+    [element, updateClip]
+  );
+
+  const handleSpeedChange = useCallback(
+    (rate) => {
+      if (!element) return;
+      const sourceDuration = (element.sourceEnd || 0) - (element.sourceStart || 0);
+      const timelineDuration = sourceDuration / rate;
+      const newEndTime = element.startTime + timelineDuration;
+      updateClip(element.id, { playbackRate: rate, endTime: newEndTime });
     },
     [element, updateClip]
   );
@@ -229,7 +240,19 @@ export default function PropertiesPanel() {
                 value={Math.round(element.startTime * 100) / 100}
                 onChange={(e) => {
                   const newStart = Number(e.target.value);
-                  handleUpdate('startTime', Math.max(0, newStart));
+                  // For video clips, cap startTime so sourceStart never goes below 0.
+                  // Use the original source video duration as the absolute reference.
+                  let cappedStart = Math.max(0, newStart);
+                  if (element.type === 'video') {
+                    const srcVideo = state.videos.find(v => v.id === element.videoId);
+                    const originalDuration = srcVideo ? srcVideo.duration : (element.sourceEnd - element.sourceStart);
+                    const timeScale = element.playbackRate || 1;
+                    const maxTimelineDuration = originalDuration / timeScale;
+                    const maxStart = element.endTime - 0.1;
+                    const minStart = Math.max(0, element.endTime - maxTimelineDuration);
+                    cappedStart = Math.max(Math.min(cappedStart, maxStart), minStart);
+                  }
+                  handleUpdate('startTime', Math.max(0, cappedStart));
                 }}
                 min={0}
                 step={0.1}
@@ -242,7 +265,16 @@ export default function PropertiesPanel() {
                 value={Math.round(element.endTime * 100) / 100}
                 onChange={(e) => {
                   const newEnd = Number(e.target.value);
-                  handleUpdate('endTime', Math.max(element.startTime + 0.1, newEnd));
+                  // For video clips, cap endTime at the original source video duration.
+                  let cappedEnd = Math.max(element.startTime + 0.1, newEnd);
+                  if (element.type === 'video') {
+                    const srcVideo = state.videos.find(v => v.id === element.videoId);
+                    const originalDuration = srcVideo ? srcVideo.duration : (element.sourceEnd - element.sourceStart);
+                    const timeScale = element.playbackRate || 1;
+                    const maxEnd = element.startTime + originalDuration / timeScale;
+                    cappedEnd = Math.min(cappedEnd, maxEnd);
+                  }
+                  handleUpdate('endTime', cappedEnd);
                 }}
                 min={element.startTime + 0.1}
                 step={0.1}
@@ -422,7 +454,7 @@ export default function PropertiesPanel() {
                   max={4}
                   step={0.05}
                   value={element.playbackRate ?? 1}
-                  onChange={(e) => debouncedUpdate('playbackRate', Number(e.target.value), 80)}
+                  onChange={(e) => handleSpeedChange(Number(e.target.value))}
                 />
                 <span className="prop-range-value prop-speed-value">
                   {(element.playbackRate ?? 1).toFixed(2)}×
@@ -433,7 +465,7 @@ export default function PropertiesPanel() {
                   <button
                     key={rate}
                     className={`prop-speed-preset-btn ${(element.playbackRate ?? 1) === rate ? 'active' : ''}`}
-                    onClick={() => handleUpdate('playbackRate', rate)}
+                    onClick={() => handleSpeedChange(rate)}
                   >
                     {rate}×
                   </button>
