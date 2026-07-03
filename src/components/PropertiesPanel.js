@@ -459,7 +459,7 @@ export default function PropertiesPanel() {
                 <input
                   type="range"
                   min={0.25}
-                  max={4}
+                  max={15}
                   step={0.05}
                   value={element.playbackRate ?? 1}
                   onChange={(e) => handleSpeedChange(Number(e.target.value))}
@@ -469,7 +469,7 @@ export default function PropertiesPanel() {
                 </span>
               </div>
               <div className="prop-speed-presets">
-                {[0.25, 0.5, 1, 1.5, 2, 3, 4].map((rate) => (
+                {[0.25, 0.5, 1, 2, 4, 6, 10  ].map((rate) => (
                   <button
                     key={rate}
                     className={`prop-speed-preset-btn ${(element.playbackRate ?? 1) === rate ? 'active' : ''}`}
