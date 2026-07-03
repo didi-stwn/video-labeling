@@ -539,75 +539,88 @@ export default function Timeline() {
                       setCurrentTime(time);
                     }}
                   />
-                  {track.clips.map((clip) => (
-                    <div
-                      key={clip.id}
-                      className={`timeline-clip ${clip.type} ${clip.id === state.selectedElementId ? 'selected' : ''
-                        }`}
-                      style={{
-                        left: clip.startTime * pixelsPerSecond,
-                        width: Math.max(
-                          (clip.endTime - clip.startTime) * pixelsPerSecond,
-                          4
-                        ),
-                      }}
-                    >
+                  {track.clips.map((clip) => {
+                    const isInTimeRange = state.currentTime >= clip.startTime && state.currentTime <= clip.endTime;
+                    const splitOffset = isInTimeRange
+                      ? ((state.currentTime - clip.startTime) / (clip.endTime - clip.startTime)) * 100
+                      : null;
+                    return (
                       <div
-                        className="clip-edge clip-edge-left"
-                        onMouseDown={(e) => handleEdgeMouseDown(e, clip.id, track.id, 'start')}
-                        title="Drag to trim start"
-                      />
-                      <div className="clip-content"
-                        onMouseDown={(e) => handleClipMouseDown(e, clip, track.id)}
-                        onClick={(e) => e.stopPropagation()}
+                        key={clip.id}
+                        className={`timeline-clip ${clip.type} ${clip.id === state.selectedElementId ? 'selected' : ''
+                          }`}
+                        style={{
+                          left: clip.startTime * pixelsPerSecond,
+                          width: Math.max(
+                            (clip.endTime - clip.startTime) * pixelsPerSecond,
+                            4
+                          ),
+                        }}
                       >
-                        <span className="clip-label">
-                          {clip.type === 'video'
-                            ? '🎬'
-                            : clip.type === 'text'
-                              ? '📝'
-                              : clip.type === 'image'
-                                ? '🖼️'
-                                : clip.type === 'circle'
-                                  ? '⭕'
-                                  : clip.type === 'triangle'
-                                    ? '🔺'
-                                    : clip.type === 'arrow'
-                                      ? '➡️'
-                                      : clip.type === 'line'
-                                        ? '📏'
-                                        : '⬜'}{' '}
-                          {clip.name || clip.type || clip.text?.slice(0, 10) || 'clip'}
-                        </span>
-                        <span className="clip-duration">
-                          {(clip.endTime - clip.startTime).toFixed(1)}s
-                        </span>
-                      </div>
-                      <div
-                        className="clip-edge clip-edge-right"
-                        onMouseDown={(e) => handleEdgeMouseDown(e, clip.id, track.id, 'end')}
-                        title="Drag to trim end"
-                      />
-                      {clip.id === state.selectedElementId && (
-                        <div className="clip-actions">
-                          <button
-                            className="clip-action-btn"
-                            onClick={(e) => handleSplitClick(e, clip.id, track.id)}
-                            title="Split at playhead"
-                          >
-                            <Scissors size={10} />
-                          </button>
-                          <button
-                            className="clip-action-btn danger"
-                            onClick={(e) => handleDeleteClick(e, clip.id)}
-                            title="Delete clip"
-                          >
-                            <Trash2 size={10} />
-                          </button>
+                        <div
+                          className="clip-edge clip-edge-left"
+                          onMouseDown={(e) => handleEdgeMouseDown(e, clip.id, track.id, 'start')}
+                          title="Drag to trim start"
+                        />
+                        <div className="clip-content"
+                          onMouseDown={(e) => handleClipMouseDown(e, clip, track.id)}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <span className="clip-label">
+                            {clip.type === 'video'
+                              ? '🎬'
+                              : clip.type === 'text'
+                                ? '📝'
+                                : clip.type === 'image'
+                                  ? '🖼️'
+                                  : clip.type === 'circle'
+                                    ? '⭕'
+                                    : clip.type === 'triangle'
+                                      ? '🔺'
+                                      : clip.type === 'arrow'
+                                        ? '➡️'
+                                        : clip.type === 'line'
+                                          ? '📏'
+                                          : '⬜'}{' '}
+                            {clip.name || clip.type || clip.text?.slice(0, 10) || 'clip'}
+                          </span>
+                          <span className="clip-duration">
+                            {(clip.endTime - clip.startTime).toFixed(1)}s
+                          </span>
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        <div
+                          className="clip-edge clip-edge-right"
+                          onMouseDown={(e) => handleEdgeMouseDown(e, clip.id, track.id, 'end')}
+                          title="Drag to trim end"
+                        />
+                        {/* Hover split button at playhead position */}
+                        {isInTimeRange && (
+                          <button
+                            className="clip-split-hover-btn"
+                            style={{ left: `${splitOffset}%` }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSplitClick(e, clip.id, track.id);
+                            }}
+                            title={`Split at ${state.currentTime.toFixed(1)}s`}
+                          >
+                            <Scissors size={12} />
+                          </button>
+                        )}
+                        {clip.id === state.selectedElementId && (
+                          <div className="clip-actions">
+                            <button
+                              className="clip-action-btn danger"
+                              onClick={(e) => handleDeleteClick(e, clip.id)}
+                              title="Delete clip"
+                            >
+                              <Trash2 size={10} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
