@@ -78,7 +78,7 @@ export default function Header() {
                 title="Export as WebM (fast, VP9 codec)"
               >
                 <Save size={16} />
-                <span>Export .webm</span>
+                <span>Export to .webm</span>
               </button>
               <button
                 className="action-btn export-btn"
@@ -86,7 +86,7 @@ export default function Header() {
                 title="Export as MP4 (converted in browser, H.264 codec)"
               >
                 <Save size={16} />
-                <span>Export.mp4</span>
+                <span>Export to .mp4</span>
               </button>
             </>
           )}
