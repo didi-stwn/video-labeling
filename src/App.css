@@ -1283,6 +1283,7 @@ textarea:focus {
 .timeline-clip.circle,
 .timeline-clip.triangle,
 .timeline-clip.arrow,
+.timeline-clip.pen,
 .timeline-clip.line {
   background: var(--clip-overlay);
 }

@@ -1,6 +1,6 @@
 import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { useVideo } from '../context/VideoContext';
-import { Upload, Video, Image as ImageIcon, Monitor, Trash2, Plus, Square, Download, Pipette, Camera } from 'lucide-react';
+import { Upload, Video, Image as ImageIcon, Monitor, Trash2, Plus, Square, Download } from 'lucide-react';
 import ScreenRecorderPiP from './ScreenRecorderPiP';
 import DirectRecorder from './DirectRecorder';
 

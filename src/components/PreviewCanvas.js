@@ -12,7 +12,6 @@ export default function PreviewCanvas() {
     deselectAll,
     setSelectedIds,
     deleteSelectedClips,
-    updateSelectedClips,
     updateClip,
     deleteClip,
     addOverlayClip,
@@ -35,7 +34,7 @@ export default function PreviewCanvas() {
   const [drawStart, setDrawStart] = useState({ x: 0, y: 0 });
   const [drawCurrent, setDrawCurrent] = useState({ x: 0, y: 0 });
   const [interaction, setInteraction] = useState(null);
-  const [guides, setGuides] = useState([]); // guide lines drawn on canvas during interaction
+  const [, setGuides] = useState([]); // guide lines drawn on canvas during interaction
   const [multiRect, setMultiRect] = useState(null); // { x, y, w, h } canvas pixels
   const multiDragRef = useRef(null); // { startClipSnapshots: [{ clipId, x, y, ... }] }
 
@@ -1123,8 +1122,8 @@ export default function PreviewCanvas() {
     }
     // Multi-select rectangle drag
     if (multiRect && !interaction) {
-      const mx = Math.min(pos.x, multiRect.x);
-      const my = Math.min(pos.y, multiRect.y);
+      // const mx = Math.min(pos.x, multiRect.x);
+      // const my = Math.min(pos.y, multiRect.y);
       const mw = Math.abs(pos.x - multiRect.x);
       const mh = Math.abs(pos.y - multiRect.y);
       setMultiRect({ x: multiRect.x, y: multiRect.y, w: mw, h: mh });
@@ -1316,7 +1315,7 @@ export default function PreviewCanvas() {
       }
       updateClip(interaction.clipId, { rotation: deg });
     }
-  }, [isDrawing, interaction, getCanvasPos, computeLayout, updateClip, computeSnap, state.videos, multiRect]);
+  }, [isDrawing, interaction, getCanvasPos, computeLayout, updateClip, computeSnap, state.videos, state.images, multiRect]);
 
   const handleMouseUp = useCallback((e) => {
     // Finalize multi-select rectangle
@@ -1419,7 +1418,7 @@ export default function PreviewCanvas() {
     multiDragRef.current = null;
     guidesRef.current = [];
     setGuides([]);
-  }, [isDrawing, drawStart, getCanvasPos, canvasToPct, state.tool, addOverlayClip, multiRect, computeLayout, setSelectedIds]);
+  }, [isDrawing, drawStart, getCanvasPos, canvasToPct, state.tool, state.tracks, addOverlayClip, multiRect, computeLayout, setSelectedIds]);
 
   // Keyboard: Delete/Backspace removes selected clip(s)
   useEffect(() => {
