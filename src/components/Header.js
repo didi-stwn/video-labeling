@@ -8,6 +8,7 @@ import {
   ArrowRight,
   Minus,
   Type,
+  Pencil,
   Save,
 } from 'lucide-react';
 
@@ -16,6 +17,7 @@ const tools = [
   { id: 'rect', icon: Square, label: 'Rectangle (R)' },
   { id: 'circle', icon: Circle, label: 'Circle (C)' },
   { id: 'triangle', icon: Triangle, label: 'Triangle (T)' },
+  { id: 'pen', icon: Pencil, label: 'Pen (P)' },
   { id: 'arrow', icon: ArrowRight, label: 'Arrow (A)' },
   { id: 'line', icon: Minus, label: 'Line (L)' },
   { id: 'text', icon: Type, label: 'Text (X)' },

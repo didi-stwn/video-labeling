@@ -24,6 +24,7 @@ export default function PreviewCanvas() {
   const drawRafRef = useRef(null);
   const exportResRef = useRef(null); // sets canvas size during export
   const shiftRef = useRef(false);    // tracks Shift key state
+  const penPointsRef = useRef([]);   // freehand pen points during drawing
   const guidesRef = useRef([]);      // alignment guide lines { type: 'v'|'h', x/y: px }
   const [containerSize, setContainerSize] = useState({ width: 640, height: 360 });
   const [isDrawing, setIsDrawing] = useState(false);
@@ -65,8 +66,8 @@ export default function PreviewCanvas() {
   // Refs to latest state for the draw loop (avoids re-creating the loop)
   const stateRef = useRef(state);
   stateRef.current = state;
-  const drawStateRef = useRef({ isDrawing, drawStart, drawCurrent });
-  drawStateRef.current = { isDrawing, drawStart, drawCurrent };
+  const drawStateRef = useRef({ isDrawing, drawStart, drawCurrent, penPoints: [] });
+  drawStateRef.current = { isDrawing, drawStart, drawCurrent, penPoints: penPointsRef.current };
   const interactionRef = useRef(interaction);
   interactionRef.current = interaction;
   const containerSizeRef = useRef(containerSize);
@@ -547,6 +548,27 @@ export default function PreviewCanvas() {
               ctx.stroke();
               break;
             }
+            case 'pen': {
+              // Freehand drawing — stroke through all stored percentage points
+              const pts = clip.points || [];
+              if (pts.length > 1) {
+                ctx.strokeStyle = clip.strokeColor || '#ff0000';
+                ctx.lineWidth = (clip.strokeWidth || 2) * pxScale;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                // Points are stored normalized (relative to bounding box 0,0)
+                // so add clip.x/clip.y offset
+                const xOff = clip.x || 0;
+                const yOff = clip.y || 0;
+                ctx.moveTo(ox + ((xOff + pts[0].x) / 100) * pw, oy + ((yOff + pts[0].y) / 100) * ph);
+                for (let i = 1; i < pts.length; i++) {
+                  ctx.lineTo(ox + ((xOff + pts[i].x) / 100) * pw, oy + ((yOff + pts[i].y) / 100) * ph);
+                }
+                ctx.stroke();
+              }
+              break;
+            }
             case 'text':
               ctx.fillStyle = clip.color || '#ffffff';
               ctx.font = `${(clip.fontSize || 24) * pxScale}px ${clip.fontFamily || 'Arial'}`;
@@ -647,44 +669,61 @@ export default function PreviewCanvas() {
 
       // === In-progress drawing ===
       if (id && s.tool !== 'select') {
-        const dx2 = ds.x;
-        const dy2 = ds.y;
-        const dw2 = dc.x - dx2;
-        const dh2 = dc.y - dy2;
-
         ctx.save();
-        ctx.strokeStyle = '#4a9eff';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]);
-        ctx.fillStyle = 'rgba(74,158,255,0.1)';
-        switch (s.tool) {
-          case 'rect': case 'text': case 'image':
-            ctx.fillRect(dx2, dy2, dw2, dh2);
-            ctx.strokeRect(dx2, dy2, dw2, dh2);
-            break;
-          case 'circle':
+        if (s.tool === 'pen') {
+          // Draw freehand path from collected points
+          const pts = drawStateRef.current.penPoints || [];
+          if (pts.length > 1) {
+            ctx.strokeStyle = '#4a9eff';
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
             ctx.beginPath();
-            ctx.ellipse(dx2 + dw2 / 2, dy2 + dh2 / 2, Math.abs(dw2 / 2), Math.abs(dh2 / 2), 0, 0, Math.PI * 2);
-            ctx.fill(); ctx.stroke();
-            break;
-          case 'triangle':
-            ctx.beginPath();
-            ctx.moveTo(dx2 + dw2 / 2, dy2);
-            ctx.lineTo(dx2 + dw2, dy2 + dh2);
-            ctx.lineTo(dx2, dy2 + dh2);
-            ctx.closePath();
-            ctx.fill(); ctx.stroke();
-            break;
-          case 'arrow': case 'line':
-            ctx.beginPath();
-            ctx.moveTo(dx2, dy2);
-            ctx.lineTo(dx2 + dw2, dy2 + dh2);
+            ctx.moveTo(pts[0].x, pts[0].y);
+            for (let i = 1; i < pts.length; i++) {
+              ctx.lineTo(pts[i].x, pts[i].y);
+            }
             ctx.stroke();
-            break;
-          default:
-            break;
+          }
+        } else {
+          const dx2 = ds.x;
+          const dy2 = ds.y;
+          const dw2 = dc.x - dx2;
+          const dh2 = dc.y - dy2;
+
+          ctx.strokeStyle = '#4a9eff';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 5]);
+          ctx.fillStyle = 'rgba(74,158,255,0.1)';
+          switch (s.tool) {
+            case 'rect': case 'text': case 'image':
+              ctx.fillRect(dx2, dy2, dw2, dh2);
+              ctx.strokeRect(dx2, dy2, dw2, dh2);
+              break;
+            case 'circle':
+              ctx.beginPath();
+              ctx.ellipse(dx2 + dw2 / 2, dy2 + dh2 / 2, Math.abs(dw2 / 2), Math.abs(dh2 / 2), 0, 0, Math.PI * 2);
+              ctx.fill(); ctx.stroke();
+              break;
+            case 'triangle':
+              ctx.beginPath();
+              ctx.moveTo(dx2 + dw2 / 2, dy2);
+              ctx.lineTo(dx2 + dw2, dy2 + dh2);
+              ctx.lineTo(dx2, dy2 + dh2);
+              ctx.closePath();
+              ctx.fill(); ctx.stroke();
+              break;
+            case 'arrow': case 'line':
+              ctx.beginPath();
+              ctx.moveTo(dx2, dy2);
+              ctx.lineTo(dx2 + dw2, dy2 + dh2);
+              ctx.stroke();
+              break;
+            default:
+              break;
+          }
+          ctx.setLineDash([]);
         }
-        ctx.setLineDash([]);
         ctx.restore();
       }
 
@@ -889,6 +928,9 @@ export default function PreviewCanvas() {
       setIsDrawing(true);
       setDrawStart(pos);
       setDrawCurrent(pos);
+      if (state.tool === 'pen') {
+        penPointsRef.current = [pos];
+      }
     }
   }, [state.tool, getCanvasPos, getSelected, findHandle, findClipAtPos, selectElement, deselectAll]);
 
@@ -990,7 +1032,13 @@ export default function PreviewCanvas() {
 
   const handleMouseMove = useCallback((e) => {
     const pos = getCanvasPos(e);
-    if (isDrawing) { setDrawCurrent(pos); return; }
+    if (isDrawing) {
+      setDrawCurrent(pos);
+      if (penPointsRef.current) {
+        penPointsRef.current = [...penPointsRef.current, pos];
+      }
+      return;
+    }
     if (!interaction) return;
 
     const { pw, ph, ox, oy } = computeLayout();
@@ -1154,7 +1202,38 @@ export default function PreviewCanvas() {
       const wPct = Math.abs(endPct.x - startPct.x);
       const hPct = Math.abs(endPct.y - startPct.y);
 
-      if (wPct > 0.5 || hPct > 0.5) {
+      if (state.tool === 'pen') {
+        // Create pen overlay from collected points
+        const points = penPointsRef.current || [];
+        penPointsRef.current = [];
+        if (points.length > 1) {
+          // Convert canvas-pixel points to percentage coordinates
+          const pctPoints = points.map(p => {
+            const pct = canvasToPct(p.x, p.y);
+            return { x: pct.x, y: pct.y };
+          });
+          // Compute bounding box from all points
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          pctPoints.forEach(pt => {
+            if (pt.x < minX) minX = pt.x;
+            if (pt.y < minY) minY = pt.y;
+            if (pt.x > maxX) maxX = pt.x;
+            if (pt.y > maxY) maxY = pt.y;
+          });
+          const w = Math.max(maxX - minX, 1);
+          const h = Math.max(maxY - minY, 1);
+          // Normalize points relative to bounding box origin
+          const normalizedPoints = pctPoints.map(pt => ({ x: pt.x - minX, y: pt.y - minY }));
+          addOverlayClip({
+            type: 'pen',
+            x: minX, y: minY,
+            width: w, height: h,
+            points: normalizedPoints,
+            strokeColor: '#ff0000',
+            strokeWidth: 2,
+          });
+        }
+      } else if (wPct > 0.5 || hPct > 0.5) {
         let shapeType = state.tool;
         if (shapeType === 'image') shapeType = 'rect';
 

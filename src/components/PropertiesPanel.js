@@ -324,11 +324,12 @@ export default function PropertiesPanel() {
         {(element.type === 'rect' ||
           element.type === 'circle' ||
           element.type === 'triangle' ||
+          element.type === 'pen' ||
           element.type === 'arrow' ||
           element.type === 'line') && (
           <div className="prop-section">
             <h4 className="prop-section-title">Appearance</h4>
-            <div className="prop-grid-2">
+            <div className={element.type === 'pen' ? '' : 'prop-grid-2'}>
               <div className="prop-field">
                 <label>Stroke Color</label>
                 <input
@@ -337,45 +338,49 @@ export default function PropertiesPanel() {
                   onChange={(e) => debouncedUpdate('strokeColor', e.target.value)}
                 />
               </div>
-              <div className="prop-field">
-                <label>Stroke Width</label>
-                <input
-                  type="number"
-                  value={element.strokeWidth || 2}
-                  onChange={(e) =>
-                    handleUpdate('strokeWidth', Math.max(1, Number(e.target.value)))
-                  }
-                  min={1}
-                  max={20}
-                />
-              </div>
-            </div>
-            <div className="prop-field">
-              <label>Fill</label>
-              <div className="prop-fill-row">
-                <label className="prop-checkbox-label">
+              {element.type !== 'pen' && (
+                <div className="prop-field">
+                  <label>Stroke Width</label>
                   <input
-                    type="checkbox"
-                    checked={(element.fillColor || 'rgba(255, 0, 0, 0.3)') !== 'transparent'}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        handleUpdate('fillColor', 'rgba(255, 0, 0, 0.3)');
-                      } else {
-                        handleUpdate('fillColor', 'transparent');
-                      }
-                    }}
+                    type="number"
+                    value={element.strokeWidth || 2}
+                    onChange={(e) =>
+                      handleUpdate('strokeWidth', Math.max(1, Number(e.target.value)))
+                    }
+                    min={1}
+                    max={20}
                   />
-                  <span>Fill</span>
-                </label>
-                <input
-                  style={{width:"100%"}}
-                  type="color"
-                  value={element.fillColor && element.fillColor !== 'transparent' ? element.fillColor : '#ff0000'}
-                  onChange={(e) => debouncedUpdate('fillColor', e.target.value)}
-                  disabled={element.fillColor === 'transparent'}
-                />
-              </div>
+                </div>
+              )}
             </div>
+            {element.type !== 'pen' && (
+              <div className="prop-field">
+                <label>Fill</label>
+                <div className="prop-fill-row">
+                  <label className="prop-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={(element.fillColor || 'rgba(255, 0, 0, 0.3)') !== 'transparent'}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          handleUpdate('fillColor', 'rgba(255, 0, 0, 0.3)');
+                        } else {
+                          handleUpdate('fillColor', 'transparent');
+                        }
+                      }}
+                    />
+                    <span>Fill</span>
+                  </label>
+                  <input
+                    style={{width:"100%"}}
+                    type="color"
+                    value={element.fillColor && element.fillColor !== 'transparent' ? element.fillColor : '#ff0000'}
+                    onChange={(e) => debouncedUpdate('fillColor', e.target.value)}
+                    disabled={element.fillColor === 'transparent'}
+                  />
+                </div>
+              </div>
+            )}
             {element.type === 'rect' && (
               <div className="prop-field prop-range">
                 <label>Border Radius</label>

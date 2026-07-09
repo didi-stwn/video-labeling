@@ -13,7 +13,7 @@ const initialState = {
   currentTime: 0,
   isPlaying: false,
   duration: 30,
-  tool: 'select', // select | rect | circle | triangle | arrow | line | text | image
+  tool: 'select', // select | rect | circle | triangle | pen | arrow | line | text | image
   zoom: 1,
   nextId: 1,
   isExporting: false,
@@ -97,6 +97,8 @@ function reducer(state, action) {
         borderRadius: p.borderRadius || 0,
         imageId: p.imageId || null,
         opacity: p.opacity ?? 1,
+        // Pen freehand points
+        points: p.points || [],
         // Line/arrow endpoints (actual start & end coords)
         x1: p.x1,
         y1: p.y1,
