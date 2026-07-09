@@ -5,13 +5,13 @@ A browser-based video editing application built with React that lets you import 
 ## Preview
 
 <p align="center">
-  <a href="https://didi-stwn.github.io/video-labeling/" target="_blank">
+  <a href="https://didi-stwn.github.io/video-labeling/" target="_blank" rel="noopener noreferrer">
     <img src="public/video_labeling.png" alt="Video Labeling Preview" width="100%" />
   </a>
 </p>
 
 <p align="center">
-  <a href="https://didi-stwn.github.io/video-labeling/" target="_blank">
+  <a href="https://didi-stwn.github.io/video-labeling/" target="_blank" rel="noopener noreferrer">
     <img src="https://img.shields.io/badge/🚀_Live_Demo-Click_Here-4FC08D?style=for-the-badge" alt="Live Demo" />
   </a>
 </p>
