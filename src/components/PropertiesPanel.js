@@ -1,6 +1,6 @@
 import React, { useCallback, useRef } from 'react';
 import { useVideo } from '../context/VideoContext';
-import { Trash2, Copy } from 'lucide-react';
+import { Trash2, Copy, Crop } from 'lucide-react';
 
 export default function PropertiesPanel() {
   const {
@@ -9,6 +9,7 @@ export default function PropertiesPanel() {
     updateClip,
     deleteClip,
     duplicateClip,
+    enterCropMode,
     // selectElement,
     // deselectAll,
   } = useVideo();
@@ -443,6 +444,28 @@ export default function PropertiesPanel() {
                 onChange={(e) => debouncedUpdate('color', e.target.value)}
               />
             </div>
+          </div>
+        )}
+
+        {/* Crop Action — for video and image clips */}
+        {(element.type === 'video' || element.type === 'image') && (
+          <div className="prop-section">
+            <h4 className="prop-section-title">Transform</h4>
+            <button
+              className="prop-crop-btn"
+              onClick={() => {
+                const cropRect = element.crop || { x: 0, y: 0, width: 100, height: 100 };
+                enterCropMode(element.id, cropRect);
+              }}
+            >
+              <Crop size={14} />
+              <span>{element.crop ? 'Edit Crop' : 'Crop'}</span>
+            </button>
+            {element.crop && (
+              <div className="prop-crop-info">
+                <span>Crop: {Math.round(element.crop.x)}%, {Math.round(element.crop.y)}% → {Math.round(element.crop.width)}×{Math.round(element.crop.height)}%</span>
+              </div>
+            )}
           </div>
         )}
 

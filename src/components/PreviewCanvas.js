@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useVideo } from '../context/VideoContext';
 import { webmToMp4 } from '../utils/ffmpeg';
+import { Check, X } from 'lucide-react';
 
 const HANDLE_SIZE = 8;
 const ROTATE_HANDLE_OFFSET = 28;
@@ -18,6 +19,10 @@ export default function PreviewCanvas() {
     setCurrentTime,
     setIsPlaying,
     setExporting,
+    // enterCropMode,
+    updateCropRect,
+    exitCropMode,
+    applyCrop,
   } = useVideo();
 
   const containerRef = useRef(null);
@@ -37,6 +42,7 @@ export default function PreviewCanvas() {
   const [, setGuides] = useState([]); // guide lines drawn on canvas during interaction
   const [multiRect, setMultiRect] = useState(null); // { x, y, w, h } canvas pixels
   const multiDragRef = useRef(null); // { startClipSnapshots: [{ clipId, x, y, ... }] }
+  const [cropInteraction, setCropInteraction] = useState(null); // for crop rect resize
 
   // Track Shift key for constrained dragging/resizing
   useEffect(() => {
@@ -79,6 +85,8 @@ export default function PreviewCanvas() {
   multiRectRef.current = multiRect;
   const containerSizeRef = useRef(containerSize);
   containerSizeRef.current = containerSize;
+  const cropInteractionRef = useRef(cropInteraction);
+  cropInteractionRef.current = cropInteraction;
 
   // Playback loop — uses ref to avoid resetting on every time change
   useEffect(() => {
@@ -417,7 +425,7 @@ export default function PreviewCanvas() {
       ctx.fillStyle = '#111';
       ctx.fillRect(ox, oy, pw, ph);
 
-      // === Draw active video frames ===
+      // === Draw active video frames (with crop clipping if applicable) ===
       s.tracks.forEach((track) => {
         if (track.type !== 'video') return;
         track.clips.forEach((clip) => {
@@ -439,7 +447,22 @@ export default function PreviewCanvas() {
             dx = ox;
             dy = oy - (dh - ph) / 2;
           }
+
+          ctx.save();
+          // Apply crop clipping if the clip has a crop
+          if (clip.crop) {
+            const cropPx = {
+              x: ox + (clip.crop.x / 100) * pw,
+              y: oy + (clip.crop.y / 100) * ph,
+              width: (clip.crop.width / 100) * pw,
+              height: (clip.crop.height / 100) * ph,
+            };
+            ctx.beginPath();
+            ctx.rect(cropPx.x, cropPx.y, cropPx.width, cropPx.height);
+            ctx.clip();
+          }
           try { ctx.drawImage(video, dx, dy, dw, dh); } catch (_) { }
+          ctx.restore();
         });
       });
 
@@ -457,6 +480,19 @@ export default function PreviewCanvas() {
 
           ctx.save();
           ctx.globalAlpha = clip.opacity ?? 1;
+
+          // Apply crop clipping for overlay image/video clips
+          if (clip.crop && (clip.type === 'image' || clip.type === 'video')) {
+            const cropPx = {
+              x: cx + (clip.crop.x / 100) * cw2,
+              y: cy + (clip.crop.y / 100) * ch2,
+              width: (clip.crop.width / 100) * cw2,
+              height: (clip.crop.height / 100) * ch2,
+            };
+            ctx.beginPath();
+            ctx.rect(cropPx.x, cropPx.y, cropPx.width, cropPx.height);
+            ctx.clip();
+          }
 
           if (rot) {
             const ctrX = cx + cw2 / 2;
@@ -809,6 +845,86 @@ export default function PreviewCanvas() {
         ctx.setLineDash([]);
         ctx.restore();
       }
+
+      // === Crop mode overlay (drawn on top of everything) ===
+      const cropMode = stateRef.current.cropMode;
+      if (cropMode && cropMode.active) {
+        // Find the clip being cropped
+        let cropClip = null;
+        let cropTrackId = null;
+        s.tracks.forEach((track) => {
+          track.clips.forEach((clip) => {
+            if (clip.id === cropMode.clipId) {
+              cropClip = clip;
+              cropTrackId = track.id;
+            }
+          });
+        });
+
+        if (cropClip) {
+          const isOverlayTrack = s.tracks.find(t => t.id === cropTrackId)?.type === 'overlay';
+          let bx, by, bw, bh;
+
+          if (isOverlayTrack) {
+            bx = ox + (cropClip.x / 100) * pw;
+            by = oy + (cropClip.y / 100) * ph;
+            bw = (cropClip.width / 100) * pw;
+            bh = (cropClip.height / 100) * ph;
+          } else {
+            bx = ox; by = oy; bw = pw; bh = ph;
+          }
+
+          // Calculate crop rect in canvas pixels
+          const cr = cropMode.cropRect || { x: 0, y: 0, width: 100, height: 100 };
+          const cropPx = {
+            x: bx + (cr.x / 100) * bw,
+            y: by + (cr.y / 100) * bh,
+            width: (cr.width / 100) * bw,
+            height: (cr.height / 100) * bh,
+          };
+
+          // Draw dimmed overlay with "hole" — 4 rectangles around the crop area
+          ctx.save();
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+          // Top
+          ctx.fillRect(0, 0, w, cropPx.y);
+          // Bottom
+          ctx.fillRect(0, cropPx.y + cropPx.height, w, h - (cropPx.y + cropPx.height));
+          // Left
+          ctx.fillRect(0, cropPx.y, cropPx.x, cropPx.height);
+          // Right
+          ctx.fillRect(cropPx.x + cropPx.width, cropPx.y, w - (cropPx.x + cropPx.width), cropPx.height);
+          ctx.restore();
+
+          // Crop rect border
+          ctx.save();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([]);
+          ctx.strokeRect(cropPx.x, cropPx.y, cropPx.width, cropPx.height);
+          ctx.restore();
+
+          // Crop resize handles (8 handles like regular resize)
+          const handleSize = 10;
+          const handles = [
+            { id: 'nw', x: cropPx.x, y: cropPx.y },
+            { id: 'n', x: cropPx.x + cropPx.width / 2, y: cropPx.y },
+            { id: 'ne', x: cropPx.x + cropPx.width, y: cropPx.y },
+            { id: 'e', x: cropPx.x + cropPx.width, y: cropPx.y + cropPx.height / 2 },
+            { id: 'se', x: cropPx.x + cropPx.width, y: cropPx.y + cropPx.height },
+            { id: 's', x: cropPx.x + cropPx.width / 2, y: cropPx.y + cropPx.height },
+            { id: 'sw', x: cropPx.x, y: cropPx.y + cropPx.height },
+            { id: 'w', x: cropPx.x, y: cropPx.y + cropPx.height / 2 },
+          ];
+          handles.forEach((h) => {
+            ctx.fillStyle = '#fff';
+            ctx.strokeStyle = '#4a9eff';
+            ctx.lineWidth = 1.5;
+            ctx.fillRect(h.x - handleSize / 2, h.y - handleSize / 2, handleSize, handleSize);
+            ctx.strokeRect(h.x - handleSize / 2, h.y - handleSize / 2, handleSize, handleSize);
+          });
+        }
+      }
     };
 
     drawRafRef.current = requestAnimationFrame(draw);
@@ -933,8 +1049,88 @@ export default function PreviewCanvas() {
     return null;
   }, [state.selectedElementId, state.tracks]);
 
+  // --- Crop mode helpers ---
+  const getCropClipLayout = useCallback(() => {
+    if (!state.cropMode?.active) return null;
+    const { pw, ph, ox, oy } = computeLayout();
+    let cropClip = null;
+    let cropTrackId = null;
+    state.tracks.forEach((track) => {
+      track.clips.forEach((clip) => {
+        if (clip.id === state.cropMode.clipId) {
+          cropClip = clip;
+          cropTrackId = track.id;
+        }
+      });
+    });
+    if (!cropClip) return null;
+    const isOverlayTrack = state.tracks.find(t => t.id === cropTrackId)?.type === 'overlay';
+    let cx, cy, cw2, ch2;
+    if (isOverlayTrack) {
+      cx = ox + (cropClip.x / 100) * pw;
+      cy = oy + (cropClip.y / 100) * ph;
+      cw2 = (cropClip.width / 100) * pw;
+      ch2 = (cropClip.height / 100) * ph;
+    } else {
+      cx = ox; cy = oy; cw2 = pw; ch2 = ph;
+    }
+    const cr = state.cropMode.cropRect || { x: 0, y: 0, width: 100, height: 100 };
+    return {
+      cx, cy, cw: cw2, ch: ch2, pw, ph, ox, oy, cropRect: cr,
+      cropPx: {
+        x: cx + (cr.x / 100) * cw2,
+        y: cy + (cr.y / 100) * ch2,
+        width: (cr.width / 100) * cw2,
+        height: (cr.height / 100) * ch2,
+      },
+    };
+  }, [state.cropMode, state.tracks, computeLayout]);
+
+  const findCropHandle = useCallback((cx, cy, layout) => {
+    if (!layout) return null;
+    const { cropPx } = layout;
+    const handleSize = 10;
+    const handles = [
+      { id: 'nw', x: cropPx.x, y: cropPx.y },
+      { id: 'n', x: cropPx.x + cropPx.width / 2, y: cropPx.y },
+      { id: 'ne', x: cropPx.x + cropPx.width, y: cropPx.y },
+      { id: 'e', x: cropPx.x + cropPx.width, y: cropPx.y + cropPx.height / 2 },
+      { id: 'se', x: cropPx.x + cropPx.width, y: cropPx.y + cropPx.height },
+      { id: 's', x: cropPx.x + cropPx.width / 2, y: cropPx.y + cropPx.height },
+      { id: 'sw', x: cropPx.x, y: cropPx.y + cropPx.height },
+      { id: 'w', x: cropPx.x, y: cropPx.y + cropPx.height / 2 },
+    ];
+    for (const h of handles) {
+      if (Math.hypot(cx - h.x, cy - h.y) <= handleSize + 4) return h.id;
+    }
+    return null;
+  }, []);
+
   // --- Mouse events ---
   const handleMouseDown = useCallback((e) => {
+    // If in crop mode, handle crop rect resizing
+    if (state.cropMode?.active) {
+      const pos = getCanvasPos(e);
+      const layout = getCropClipLayout();
+      if (layout) {
+        const handleId = findCropHandle(pos.x, pos.y, layout);
+        if (handleId) {
+          setCropInteraction({
+            handleId,
+            startX: pos.x,
+            startY: pos.y,
+            startCropRect: { ...layout.cropRect },
+            layout,
+          });
+          e.stopPropagation();
+          return;
+        }
+      }
+      canvasRef.current?.focus();
+      e.stopPropagation();
+      return;
+    }
+
     // Auto-focus canvas so keyboard Delete/Backspace works after click
     canvasRef.current?.focus();
     const pos = getCanvasPos(e);
@@ -1013,7 +1209,7 @@ export default function PreviewCanvas() {
         penPointsRef.current = [pos];
       }
     }
-  }, [state.tool, getCanvasPos, getSelected, findHandle, findClipAtPos, selectElement, deselectAll]);
+  }, [state.tool, state.cropMode, getCanvasPos, getSelected, findHandle, findClipAtPos, selectElement, deselectAll, getCropClipLayout, findCropHandle]);
 
   // Snapping and guide generation for drag/resize alignment
   const SNAP_THRESHOLD_PX = 8;
@@ -1120,10 +1316,39 @@ export default function PreviewCanvas() {
       }
       return;
     }
+    // Crop mode crop rect resize
+    if (cropInteraction) {
+      const { handleId, startX, startY, startCropRect, layout } = cropInteraction;
+      const {
+        // cx, cy, 
+        cw, ch } = layout;
+      const pctDx = ((pos.x - startX) / cw) * 100;
+      const pctDy = ((pos.y - startY) / ch) * 100;
+
+      let nx = startCropRect.x;
+      let ny = startCropRect.y;
+      let nw = startCropRect.width;
+      let nh = startCropRect.height;
+
+      const h = handleId || '';
+      if (h.includes('n')) { ny = startCropRect.y + pctDy; nh = startCropRect.height - pctDy; }
+      if (h.includes('s')) { nh = startCropRect.height + pctDy; }
+      if (h.includes('w')) { nx = startCropRect.x + pctDx; nw = startCropRect.width - pctDx; }
+      if (h.includes('e')) { nw = startCropRect.width + pctDx; }
+
+      // Clamp
+      if (nw < 5) nw = 5;
+      if (nh < 5) nh = 5;
+      if (nx < 0) { nw += nx; nx = 0; }
+      if (ny < 0) { nh += ny; ny = 0; }
+      if (nx + nw > 100) nw = 100 - nx;
+      if (ny + nh > 100) nh = 100 - ny;
+
+      updateCropRect({ x: nx, y: ny, width: nw, height: nh });
+      return;
+    }
     // Multi-select rectangle drag
     if (multiRect && !interaction) {
-      // const mx = Math.min(pos.x, multiRect.x);
-      // const my = Math.min(pos.y, multiRect.y);
       const mw = Math.abs(pos.x - multiRect.x);
       const mh = Math.abs(pos.y - multiRect.y);
       setMultiRect({ x: multiRect.x, y: multiRect.y, w: mw, h: mh });
@@ -1315,9 +1540,15 @@ export default function PreviewCanvas() {
       }
       updateClip(interaction.clipId, { rotation: deg });
     }
-  }, [isDrawing, interaction, getCanvasPos, computeLayout, updateClip, computeSnap, state.videos, state.images, multiRect]);
+  }, [isDrawing, interaction, getCanvasPos, computeLayout, updateClip, computeSnap, state.videos, state.images, multiRect, cropInteraction, updateCropRect]);
 
   const handleMouseUp = useCallback((e) => {
+    // Crop mode — just end crop interaction
+    if (cropInteraction) {
+      setCropInteraction(null);
+      return;
+    }
+
     // Finalize multi-select rectangle
     if (multiRect) {
       const mr = multiRect;
@@ -1416,9 +1647,10 @@ export default function PreviewCanvas() {
     }
     setInteraction(null);
     multiDragRef.current = null;
+    setCropInteraction(null);
     guidesRef.current = [];
     setGuides([]);
-  }, [isDrawing, drawStart, getCanvasPos, canvasToPct, state.tool, state.tracks, addOverlayClip, multiRect, computeLayout, setSelectedIds]);
+  }, [isDrawing, drawStart, getCanvasPos, canvasToPct, state.tool, state.tracks, addOverlayClip, multiRect, computeLayout, setSelectedIds, cropInteraction]);
 
   // Keyboard: Delete/Backspace removes selected clip(s)
   useEffect(() => {
@@ -1433,17 +1665,39 @@ export default function PreviewCanvas() {
           deleteClip(state.selectedElementId);
           e.preventDefault();
         }
+      } else if (e.key === 'Escape' && state.cropMode?.active) {
+        exitCropMode();
+        e.preventDefault();
+      } else if ((e.key === 'Enter' || e.key === ' ') && state.cropMode?.active) {
+        e.preventDefault();
+        if (state.cropMode.active) {
+          applyCrop(state.cropMode.clipId, state.cropMode.cropRect);
+        }
       }
     };
     canvas.addEventListener('keydown', onKey);
     return () => canvas.removeEventListener('keydown', onKey);
-  }, [state.selectedElementIds, state.selectedElementId, deleteSelectedClips, deleteClip]);
+  }, [state.selectedElementIds, state.selectedElementId, deleteSelectedClips, deleteClip, state.cropMode, exitCropMode, applyCrop]);
 
   // --- Cursor ---
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const onMove = (e) => {
+      if (state.cropMode?.active) {
+        const pos = getCanvasPos(e);
+        const layout = getCropClipLayout();
+        if (layout) {
+          const handleId = findCropHandle(pos.x, pos.y, layout);
+          if (handleId) {
+            const map = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' };
+            canvas.style.cursor = map[handleId] || 'default';
+          } else {
+            canvas.style.cursor = 'crosshair';
+          }
+        }
+        return;
+      }
       if (state.tool !== 'select' || interaction) return;
       const pos = getCanvasPos(e);
       const sel = getSelected();
@@ -1461,7 +1715,7 @@ export default function PreviewCanvas() {
     };
     canvas.addEventListener('mousemove', onMove);
     return () => canvas.removeEventListener('mousemove', onMove);
-  }, [state.tool, state.tracks, getCanvasPos, getSelected, findHandle, findClipAtPos, interaction]);
+  }, [state.tool, state.tracks, state.cropMode, getCanvasPos, getSelected, findHandle, findClipAtPos, interaction, getCropClipLayout, findCropHandle]);
 
   // Collect video clips from ALL tracks (video tracks + overlay tracks)
   const videoClips = [];
@@ -1481,8 +1735,28 @@ export default function PreviewCanvas() {
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onMouseLeave={() => { setIsDrawing(false); setInteraction(null); guidesRef.current = []; setGuides([]); setMultiRect(null); }}
+        onMouseLeave={() => { setIsDrawing(false); setInteraction(null); setCropInteraction(null); guidesRef.current = []; setGuides([]); setMultiRect(null); }}
       />
+
+      {/* Crop mode toolbar with Check and X buttons */}
+      {state.cropMode?.active && (
+        <div className="crop-mode-toolbar">
+          <button
+            className="crop-mode-toolbar-btn cancel"
+            onClick={() => exitCropMode()}
+            title="Cancel crop (Esc)"
+          >
+            <X size={18} />
+          </button>
+          <button
+            className="crop-mode-toolbar-btn confirm"
+            onClick={() => applyCrop(state.cropMode.clipId, state.cropMode.cropRect)}
+            title="Apply crop (Enter)"
+          >
+            <Check size={18} />
+          </button>
+        </div>
+      )}
 
       {/* Video elements — invisible but positioned so the browser decodes frames */}
       {videoClips.map((clip) => (

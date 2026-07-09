@@ -1721,6 +1721,96 @@ textarea:focus {
   cursor: not-allowed;
 }
 
+/* ===== Crop Button ===== */
+.prop-crop-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  transition: all var(--transition);
+  cursor: pointer;
+}
+
+.prop-crop-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.prop-crop-info {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+/* ===== Crop Mode Overlay ===== */
+.crop-mode-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  cursor: default;
+}
+
+.crop-mode-toolbar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  box-shadow: var(--shadow-md);
+  z-index: 25;
+}
+
+.crop-mode-toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  transition: all var(--transition);
+  cursor: pointer;
+}
+
+.crop-mode-toolbar-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.crop-mode-toolbar-btn.confirm {
+  color: var(--success);
+}
+
+.crop-mode-toolbar-btn.confirm:hover {
+  background: rgba(43, 138, 62, 0.10);
+  color: var(--success);
+}
+
+.crop-mode-toolbar-btn.cancel {
+  color: var(--danger);
+}
+
+.crop-mode-toolbar-btn.cancel:hover {
+  background: rgba(224, 49, 49, 0.10);
+  color: var(--danger);
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 1100px) {
   .sidebar-left {

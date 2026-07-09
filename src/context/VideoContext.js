@@ -20,6 +20,7 @@ const initialState = {
   isExporting: false,
   exportProgress: 0,
   exportFormat: null, // 'webm' | 'mp4'
+  cropMode: null, // { active: boolean, clipId: string, cropRect: { x, y, width, height } }
 };
 
 let clipIdCounter = 1;
@@ -488,6 +489,42 @@ function reducer(state, action) {
       };
     }
 
+    case 'ENTER_CROP_MODE': {
+      const { clipId, cropRect } = action.payload;
+      return {
+        ...state,
+        cropMode: { active: true, clipId, cropRect: { ...cropRect } },
+      };
+    }
+
+    case 'UPDATE_CROP_RECT': {
+      if (!state.cropMode || !state.cropMode.active) return state;
+      return {
+        ...state,
+        cropMode: {
+          ...state.cropMode,
+          cropRect: { ...action.payload.cropRect },
+        },
+      };
+    }
+
+    case 'EXIT_CROP_MODE':
+      return { ...state, cropMode: null };
+
+    case 'APPLY_CROP': {
+      const { clipId, cropRect } = action.payload;
+      return {
+        ...state,
+        cropMode: null,
+        tracks: state.tracks.map((track) => ({
+          ...track,
+          clips: track.clips.map((clip) =>
+            clip.id === clipId ? { ...clip, crop: { ...cropRect } } : clip
+          ),
+        })),
+      };
+    }
+
     default:
       return state;
   }
@@ -657,6 +694,29 @@ export function VideoProvider({ children }) {
     []
   );
 
+  const enterCropMode = useCallback(
+    (clipId, cropRect) =>
+      dispatch({ type: 'ENTER_CROP_MODE', payload: { clipId, cropRect } }),
+    []
+  );
+
+  const updateCropRect = useCallback(
+    (cropRect) =>
+      dispatch({ type: 'UPDATE_CROP_RECT', payload: { cropRect } }),
+    []
+  );
+
+  const exitCropMode = useCallback(
+    () => dispatch({ type: 'EXIT_CROP_MODE' }),
+    []
+  );
+
+  const applyCrop = useCallback(
+    (clipId, cropRect) =>
+      dispatch({ type: 'APPLY_CROP', payload: { clipId, cropRect } }),
+    []
+  );
+
   const duplicateClip = useCallback(
     (clipId, trackId) =>
       dispatch({
@@ -710,6 +770,10 @@ export function VideoProvider({ children }) {
     duplicateClip,
     getSelectedElement,
     setExporting,
+    enterCropMode,
+    updateCropRect,
+    exitCropMode,
+    applyCrop,
   };
 
   return (
