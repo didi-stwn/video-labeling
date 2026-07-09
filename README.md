@@ -2,6 +2,20 @@
 
 A browser-based video editing application built with React that lets you import videos and images, arrange them on a multi-track timeline, draw overlay shapes (rectangles, circles, triangles, arrows, lines, text), adjust playback speed, trim clips, record screen, and export the final composition as WebM or MP4 — all client-side, no server required.
 
+## Preview
+
+<p align="center">
+  <a href="https://didi-stwn.github.io/video-labeling/" target="_blank">
+    <img src="public/video_labeling.png" alt="Video Labeling Preview" width="100%" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://didi-stwn.github.io/video-labeling/" target="_blank">
+    <img src="https://img.shields.io/badge/🚀_Live_Demo-Click_Here-4FC08D?style=for-the-badge" alt="Live Demo" />
+  </a>
+</p>
+
 ## Features
 
 ### Media Management ([`MediaPanel.js`](src/components/MediaPanel.js))
