@@ -23,11 +23,30 @@ export default function PreviewCanvas() {
   const animFrameRef = useRef(null);
   const drawRafRef = useRef(null);
   const exportResRef = useRef(null); // sets canvas size during export
+  const shiftRef = useRef(false);    // tracks Shift key state
+  const guidesRef = useRef([]);      // alignment guide lines { type: 'v'|'h', x/y: px }
   const [containerSize, setContainerSize] = useState({ width: 640, height: 360 });
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStart, setDrawStart] = useState({ x: 0, y: 0 });
   const [drawCurrent, setDrawCurrent] = useState({ x: 0, y: 0 });
   const [interaction, setInteraction] = useState(null);
+  const [guides, setGuides] = useState([]); // guide lines drawn on canvas during interaction
+
+  // Track Shift key for constrained dragging/resizing
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === 'Shift') shiftRef.current = true;
+    };
+    const onKeyUp = (e) => {
+      if (e.key === 'Shift') shiftRef.current = false;
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, []);
 
   // Resize observer
   useEffect(() => {
@@ -678,6 +697,33 @@ export default function PreviewCanvas() {
         ctx.beginPath(); ctx.moveTo(gx, oy); ctx.lineTo(gx, oy + ph); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(ox, gy); ctx.lineTo(ox + pw, gy); ctx.stroke();
       }
+
+      // === Alignment guide lines (solid bright cyan, drawn on top of everything) ===
+      const activeGuides = guidesRef.current;
+      if (activeGuides.length > 0) {
+        ctx.save();
+        // Use bright cyan with high opacity so it's unmistakable on dark bg
+        ctx.strokeStyle = '#00e5ff';
+        ctx.lineWidth = 2;
+        // Solid lines — dashes may be harder to spot
+        ctx.setLineDash([]);
+        // Draw on top by using source-over (default)
+        ctx.globalCompositeOperation = 'source-over';
+        activeGuides.forEach((g) => {
+          if (g.type === 'v') {
+            ctx.beginPath();
+            ctx.moveTo(g.pos, oy);
+            ctx.lineTo(g.pos, oy + ph);
+            ctx.stroke();
+          } else {
+            ctx.beginPath();
+            ctx.moveTo(ox, g.pos);
+            ctx.lineTo(ox + pw, g.pos);
+            ctx.stroke();
+          }
+        });
+        ctx.restore();
+      }
     };
 
     drawRafRef.current = requestAnimationFrame(draw);
@@ -846,30 +892,161 @@ export default function PreviewCanvas() {
     }
   }, [state.tool, getCanvasPos, getSelected, findHandle, findClipAtPos, selectElement, deselectAll]);
 
+  // Snapping and guide generation for drag/resize alignment
+  const SNAP_THRESHOLD_PX = 8;
+
+  const computeSnap = useCallback((curBounds, pw, ph, ox, oy, interactingClipId) => {
+    const guides = [];
+    let bestDx = 0;
+    let bestDy = 0;
+    let snappedX = curBounds.x;
+    let snappedY = curBounds.y;
+
+    // Current element edges in percentage
+    const cL = curBounds.x;
+    const cR = curBounds.x + curBounds.width;
+    const cC = curBounds.x + curBounds.width / 2;
+    const cT = curBounds.y;
+    const cB = curBounds.y + curBounds.height;
+    const cM = curBounds.y + curBounds.height / 2;
+
+    // Threshold in percentage (convert pixel threshold to percentage of preview area)
+    const thX = (SNAP_THRESHOLD_PX / pw) * 100;
+    const thY = (SNAP_THRESHOLD_PX / ph) * 100;
+
+    // Collect overlay clips in preview area (exclude self)
+    const overlays = [];
+    const s = stateRef.current;
+    s.tracks.forEach(t => {
+      if (t.type !== 'overlay') return;
+      t.clips.forEach(cl => {
+        if (cl.id === interactingClipId) return;
+        overlays.push(cl);
+      });
+    });
+
+    // Candidate list: { delta, guidePx, type }
+    const xCandidates = [];
+    const yCandidates = [];
+
+    // Check vertical alignment: our edge vs their edge/location
+    const addX = (ourEdge, theirX) => {
+      const d = theirX - ourEdge;
+      if (Math.abs(d) < thX) {
+        const guidePx = (theirX / 100) * pw + ox;
+        xCandidates.push({ delta: d, guidePx });
+      }
+    };
+
+    // Check horizontal alignment
+    const addY = (ourEdge, theirY) => {
+      const d = theirY - ourEdge;
+      if (Math.abs(d) < thY) {
+        const guidePx = (theirY / 100) * ph + oy;
+        yCandidates.push({ delta: d, guidePx });
+      }
+    };
+
+    // Check against canvas center
+    addX(cL, 50); addX(cC, 50); addX(cR, 50);
+    addY(cT, 50); addY(cM, 50); addY(cB, 50);
+
+    // Check against all other overlays
+    overlays.forEach(cl => {
+      const oL = cl.x;
+      const oR = cl.x + cl.width;
+      const oC = cl.x + cl.width / 2;
+      const oT = cl.y;
+      const oB = cl.y + cl.height;
+      const oM = cl.y + cl.height / 2;
+
+      addX(cL, oL); addX(cL, oC); addX(cL, oR);
+      addX(cC, oL); addX(cC, oC); addX(cC, oR);
+      addX(cR, oL); addX(cR, oC); addX(cR, oR);
+
+      addY(cT, oT); addY(cT, oM); addY(cT, oB);
+      addY(cM, oT); addY(cM, oM); addY(cM, oB);
+      addY(cB, oT); addY(cB, oM); addY(cB, oB);
+    });
+
+    // Pick the nearest snap in each axis
+    if (xCandidates.length > 0) {
+      xCandidates.sort((a, b) => Math.abs(a.delta) - Math.abs(b.delta));
+      bestDx = xCandidates[0].delta;
+      snappedX = curBounds.x + bestDx;
+      // Add guide for the nearest V snap
+      guides.push({ type: 'v', pos: xCandidates[0].guidePx });
+    }
+    if (yCandidates.length > 0) {
+      yCandidates.sort((a, b) => Math.abs(a.delta) - Math.abs(b.delta));
+      bestDy = yCandidates[0].delta;
+      snappedY = curBounds.y + bestDy;
+      // Add guide for the nearest H snap
+      guides.push({ type: 'h', pos: yCandidates[0].guidePx });
+    }
+
+    return { sx: snappedX, sy: snappedY, guides };
+  }, []);
+
   const handleMouseMove = useCallback((e) => {
     const pos = getCanvasPos(e);
     if (isDrawing) { setDrawCurrent(pos); return; }
     if (!interaction) return;
 
+    const { pw, ph, ox, oy } = computeLayout();
+    const shift = shiftRef.current;
+
     if (interaction.type === 'drag') {
-      const { pw, ph } = computeLayout();
       const dx = ((pos.x - interaction.startX) / pw) * 100;
       const dy = ((pos.y - interaction.startY) / ph) * 100;
       const sc = interaction.startClip;
-      const nx = Math.max(0, Math.min(100 - sc.width, sc.x + dx));
-      const ny = Math.max(0, Math.min(100 - sc.height, sc.y + dy));
-      const patch = { x: nx, y: ny };
+
+      // Shift-constrain: lock to the axis with larger movement
+      let fx = dx, fy = dy;
+      if (shift) {
+        if (Math.abs(dx) > Math.abs(dy)) {
+          fy = 0;
+        } else {
+          fx = 0;
+        }
+      }
+
+      const nx = Math.max(0, Math.min(100 - sc.width, sc.x + fx));
+      const ny = Math.max(0, Math.min(100 - sc.height, sc.y + fy));
+
+      // Alignment snap
+      const { sx: snapX, sy: snapY, guides: newGuides } = computeSnap(
+        { x: nx, y: ny, width: sc.width, height: sc.height },
+        pw, ph, ox, oy, interaction.clipId
+      );
+
+      const finalX = Math.max(0, Math.min(100 - sc.width, snapX));
+      const finalY = Math.max(0, Math.min(100 - sc.height, snapY));
+
+      const patch = { x: finalX, y: finalY };
       // Keep line/arrow endpoints in sync with bounding box
-      if (sc.x1 !== undefined) patch.x1 = (sc.x1 ?? 0) + (nx - sc.x);
-      if (sc.y1 !== undefined) patch.y1 = (sc.y1 ?? 0) + (ny - sc.y);
-      if (sc.x2 !== undefined) patch.x2 = (sc.x2 ?? 0) + (nx - sc.x);
-      if (sc.y2 !== undefined) patch.y2 = (sc.y2 ?? 0) + (ny - sc.y);
+      if (sc.x1 !== undefined) patch.x1 = (sc.x1 ?? 0) + (finalX - sc.x);
+      if (sc.y1 !== undefined) patch.y1 = (sc.y1 ?? 0) + (finalY - sc.y);
+      if (sc.x2 !== undefined) patch.x2 = (sc.x2 ?? 0) + (finalX - sc.x);
+      if (sc.y2 !== undefined) patch.y2 = (sc.y2 ?? 0) + (finalY - sc.y);
       updateClip(interaction.clipId, patch);
+
+      guidesRef.current = newGuides;
+      setGuides(newGuides);
     } else if (interaction.type === 'resize') {
-      const { pw, ph } = computeLayout();
-      const dx = ((pos.x - interaction.startX) / pw) * 100;
-      const dy = ((pos.y - interaction.startY) / ph) * 100;
+      let dx = ((pos.x - interaction.startX) / pw) * 100;
+      let dy = ((pos.y - interaction.startY) / ph) * 100;
       const sc = interaction.startClip;
+
+      // Shift-constrain resize: lock to dominant axis
+      if (shift) {
+        if (Math.abs(dx) > Math.abs(dy)) {
+          dy = 0;
+        } else {
+          dx = 0;
+        }
+      }
+
       let nx = sc.x, ny = sc.y, nw = sc.width, nh = sc.height;
       const h = interaction.handleId || '';
       if (h.includes('n')) { ny = sc.y + dy; nh = sc.height - dy; }
@@ -883,10 +1060,34 @@ export default function PreviewCanvas() {
       nw = Math.min(nw, 100 - nx);
       nh = Math.min(nh, 100 - ny);
 
-      // For video/image overlays, optionally lock aspect ratio so source appears unstretched.
-      // Overlay coords are % of a 16:9 preview area, so rendered pixels are:
-      //   pixelW = (width%/100) * pw,  pixelH = (height%/100) * ph,  pw/ph = 16/9
-      // For unstretched: pixelW/pixelH = mediaAspect  →  width/height = mediaAspect / (16/9)
+      // Snap resize edges
+      const { sx: snapX, sy: snapY, guides: newGuides } = computeSnap(
+        { x: nx, y: ny, width: nw, height: nh },
+        pw, ph, ox, oy, interaction.clipId
+      );
+
+      // Only apply snap to the edges that are being moved
+      let fnx = nx, fny = ny, fnw = nw, fnh = nh;
+      if (snapX !== nx) {
+        if (h.includes('w')) {
+          const oldR = nx + nw;
+          fnx = snapX;
+          fnw = Math.max(2, oldR - snapX);
+        } else if (h.includes('e')) {
+          fnw = Math.max(2, snapX + nw - nx);
+        }
+      }
+      if (snapY !== ny) {
+        if (h.includes('n')) {
+          const oldB = ny + nh;
+          fny = snapY;
+          fnh = Math.max(2, oldB - snapY);
+        } else if (h.includes('s')) {
+          fnh = Math.max(2, snapY + nh - ny);
+        }
+      }
+
+      // For video/image overlays, optionally lock aspect ratio
       const lockAR = sc.lockAspectRatio !== false;
       if (lockAR && (sc.type === 'video' || sc.type === 'image')) {
         const frameAspect = 16 / 9;
@@ -900,36 +1101,39 @@ export default function PreviewCanvas() {
           const ratio = mediaAspect / frameAspect;
           const isCorner = (h.includes('n') || h.includes('s')) && (h.includes('e') || h.includes('w'));
           if (isCorner) {
-            const dwAbs = Math.abs(nw - sc.width);
-            const dhAbs = Math.abs(nh - sc.height);
+            const dwAbs = Math.abs(fnw - sc.width);
+            const dhAbs = Math.abs(fnh - sc.height);
             if (dwAbs / Math.max(sc.width, 1) > dhAbs / Math.max(sc.height, 1)) {
-              nh = nw / ratio;
+              fnh = fnw / ratio;
             } else {
-              nw = nh * ratio;
+              fnw = fnh * ratio;
             }
           } else if (h.includes('e') || h.includes('w')) {
-            nh = nw / ratio;
+            fnh = fnw / ratio;
           } else if (h.includes('n') || h.includes('s')) {
-            nw = nh * ratio;
+            fnw = fnh * ratio;
           }
         }
       }
-      const patch = { x: nx, y: ny, width: nw, height: nh };
+
+      const patch = { x: fnx, y: fny, width: fnw, height: fnh };
       // Keep line/arrow endpoints in sync with resized bounding box
       if (sc.x1 !== undefined && sc.width > 0 && sc.height > 0) {
         const rx1 = (sc.x1 - sc.x) / sc.width;
         const ry1 = (sc.y1 - sc.y) / sc.height;
         const rx2 = (sc.x2 - sc.x) / sc.width;
         const ry2 = (sc.y2 - sc.y) / sc.height;
-        patch.x1 = nx + rx1 * nw;
-        patch.y1 = ny + ry1 * nh;
-        patch.x2 = nx + rx2 * nw;
-        patch.y2 = ny + ry2 * nh;
+        patch.x1 = fnx + rx1 * fnw;
+        patch.y1 = fny + ry1 * fnh;
+        patch.x2 = fnx + rx2 * fnw;
+        patch.y2 = fny + ry2 * fnh;
       }
       updateClip(interaction.clipId, patch);
+
+      guidesRef.current = newGuides;
+      setGuides(newGuides);
     } else if (interaction.type === 'rotate') {
       const sc = interaction.startClip;
-      const { pw, ph, ox, oy } = computeLayout();
       const ctrX = ox + (sc.x / 100) * pw + (sc.width / 100) * pw / 2;
       const ctrY = oy + (sc.y / 100) * ph + (sc.height / 100) * ph / 2;
       const startA = Math.atan2(interaction.startY - ctrY, interaction.startX - ctrX);
@@ -940,7 +1144,7 @@ export default function PreviewCanvas() {
       }
       updateClip(interaction.clipId, { rotation: deg });
     }
-  }, [isDrawing, interaction, getCanvasPos, computeLayout, updateClip]);
+  }, [isDrawing, interaction, getCanvasPos, computeLayout, updateClip, computeSnap, state.videos]);
 
   const handleMouseUp = useCallback((e) => {
     if (isDrawing) {
@@ -980,6 +1184,8 @@ export default function PreviewCanvas() {
       setIsDrawing(false);
     }
     setInteraction(null);
+    guidesRef.current = [];
+    setGuides([]);
   }, [isDrawing, drawStart, getCanvasPos, canvasToPct, state.tool, addOverlayClip]);
 
   // --- Cursor ---
@@ -1024,7 +1230,7 @@ export default function PreviewCanvas() {
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onMouseLeave={() => { setIsDrawing(false); setInteraction(null); }}
+        onMouseLeave={() => { setIsDrawing(false); setInteraction(null); guidesRef.current = []; setGuides([]); }}
       />
 
       {/* Video elements — invisible but positioned so the browser decodes frames */}
