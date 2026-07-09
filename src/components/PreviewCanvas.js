@@ -10,7 +10,11 @@ export default function PreviewCanvas() {
     state,
     selectElement,
     deselectAll,
+    setSelectedIds,
+    deleteSelectedClips,
+    updateSelectedClips,
     updateClip,
+    deleteClip,
     addOverlayClip,
     setCurrentTime,
     setIsPlaying,
@@ -32,6 +36,8 @@ export default function PreviewCanvas() {
   const [drawCurrent, setDrawCurrent] = useState({ x: 0, y: 0 });
   const [interaction, setInteraction] = useState(null);
   const [guides, setGuides] = useState([]); // guide lines drawn on canvas during interaction
+  const [multiRect, setMultiRect] = useState(null); // { x, y, w, h } canvas pixels
+  const multiDragRef = useRef(null); // { startClipSnapshots: [{ clipId, x, y, ... }] }
 
   // Track Shift key for constrained dragging/resizing
   useEffect(() => {
@@ -70,6 +76,8 @@ export default function PreviewCanvas() {
   drawStateRef.current = { isDrawing, drawStart, drawCurrent, penPoints: penPointsRef.current };
   const interactionRef = useRef(interaction);
   interactionRef.current = interaction;
+  const multiRectRef = useRef(null);
+  multiRectRef.current = multiRect;
   const containerSizeRef = useRef(containerSize);
   containerSizeRef.current = containerSize;
 
@@ -667,6 +675,29 @@ export default function PreviewCanvas() {
         });
       });
 
+      // === Multi-selection highlight ===
+      const selIds = s.selectedElementIds || [];
+      if (selIds.length > 1) {
+        overlayTracks.forEach((track) => {
+          track.clips.forEach((clip) => {
+            if (!selIds.includes(clip.id)) return;
+            if (s.currentTime < clip.startTime || s.currentTime > clip.endTime) return;
+            const cx = ox + (clip.x / 100) * pw;
+            const cy = oy + (clip.y / 100) * ph;
+            const cw2 = (clip.width / 100) * pw;
+            const ch2 = (clip.height / 100) * ph;
+            ctx.save();
+            ctx.strokeStyle = '#00e5ff';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.strokeRect(cx, cy, cw2, ch2);
+            ctx.setLineDash([]);
+            ctx.restore();
+          });
+        });
+      }
+
+
       // === In-progress drawing ===
       if (id && s.tool !== 'select') {
         ctx.save();
@@ -761,6 +792,22 @@ export default function PreviewCanvas() {
             ctx.stroke();
           }
         });
+        ctx.restore();
+      }
+
+      // === Multi-select rectangle ===
+      const mr = multiRectRef.current;
+      if (mr && (mr.w > 2 || mr.h > 2)) {
+        ctx.save();
+        ctx.strokeStyle = '#4a9eff';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 5]);
+        ctx.fillStyle = 'rgba(74,158,255,0.08)';
+        const rx = Math.min(mr.x, mr.x + mr.w);
+        const ry = Math.min(mr.y, mr.y + mr.h);
+        ctx.fillRect(rx, ry, mr.w, mr.h);
+        ctx.strokeRect(rx, ry, mr.w, mr.h);
+        ctx.setLineDash([]);
         ctx.restore();
       }
     };
@@ -892,6 +939,8 @@ export default function PreviewCanvas() {
     // Auto-focus canvas so keyboard Delete/Backspace works after click
     canvasRef.current?.focus();
     const pos = getCanvasPos(e);
+    const curSelIds = stateRef.current.selectedElementIds || [];
+    const isMulti = curSelIds.length > 0;
     if (state.tool === 'select') {
       const sel = getSelected();
       if (sel) {
@@ -912,7 +961,37 @@ export default function PreviewCanvas() {
       }
       const found = findClipAtPos(pos.x, pos.y);
       if (found) {
-        selectElement(found.clip.id);
+        // Shift+click → additive toggle only, no drag start
+        if (e.shiftKey) {
+          selectElement(found.clip.id, true);
+          e.stopPropagation();
+          return;
+        }
+        // Click on an already-selected clip → keep multi-selection, drag all together
+        if (isMulti && curSelIds.includes(found.clip.id)) {
+          // Don't call selectElement — selection stays as-is
+        } else {
+          // Click on a non-selected clip → select just this one
+          selectElement(found.clip.id);
+        }
+        // Snapshot all selected clip starting positions for consistent multi-drag
+        const otherMultiIds = (isMulti && curSelIds.includes(found.clip.id))
+          ? curSelIds.filter(id => id !== found.clip.id)
+          : [];
+        const snapshots = {};
+        if (otherMultiIds.length > 0) {
+          stateRef.current.tracks.forEach(t => {
+            if (t.type !== 'overlay') return;
+            t.clips.forEach(c => {
+              if (otherMultiIds.includes(c.id)) {
+                snapshots[c.id] = { x: c.x, y: c.y, x1: c.x1, y1: c.y1, x2: c.x2, y2: c.y2 };
+              }
+            });
+          });
+        }
+        multiDragRef.current = snapshots;
+
+        // Start drag interaction for this clip
         setInteraction({
           type: 'drag',
           clipId: found.clip.id,
@@ -920,9 +999,12 @@ export default function PreviewCanvas() {
           startX: pos.x,
           startY: pos.y,
           startClip: { ...found.clip },
+          multiIds: otherMultiIds,
         });
       } else {
+        // No clip hit → start multi-select rectangle
         deselectAll();
+        setMultiRect({ x: pos.x, y: pos.y, w: 0, h: 0 });
       }
     } else {
       setIsDrawing(true);
@@ -1039,6 +1121,15 @@ export default function PreviewCanvas() {
       }
       return;
     }
+    // Multi-select rectangle drag
+    if (multiRect && !interaction) {
+      const mx = Math.min(pos.x, multiRect.x);
+      const my = Math.min(pos.y, multiRect.y);
+      const mw = Math.abs(pos.x - multiRect.x);
+      const mh = Math.abs(pos.y - multiRect.y);
+      setMultiRect({ x: multiRect.x, y: multiRect.y, w: mw, h: mh });
+      return;
+    }
     if (!interaction) return;
 
     const { pw, ph, ox, oy } = computeLayout();
@@ -1071,13 +1162,46 @@ export default function PreviewCanvas() {
       const finalX = Math.max(0, Math.min(100 - sc.width, snapX));
       const finalY = Math.max(0, Math.min(100 - sc.height, snapY));
 
+      // Actual delta applied (after clamping/snapping)
+      const appliedDx = finalX - sc.x;
+      const appliedDy = finalY - sc.y;
+
+      // Move the dragged clip
       const patch = { x: finalX, y: finalY };
       // Keep line/arrow endpoints in sync with bounding box
-      if (sc.x1 !== undefined) patch.x1 = (sc.x1 ?? 0) + (finalX - sc.x);
-      if (sc.y1 !== undefined) patch.y1 = (sc.y1 ?? 0) + (finalY - sc.y);
-      if (sc.x2 !== undefined) patch.x2 = (sc.x2 ?? 0) + (finalX - sc.x);
-      if (sc.y2 !== undefined) patch.y2 = (sc.y2 ?? 0) + (finalY - sc.y);
+      if (sc.x1 !== undefined) patch.x1 = (sc.x1 ?? 0) + appliedDx;
+      if (sc.y1 !== undefined) patch.y1 = (sc.y1 ?? 0) + appliedDy;
+      if (sc.x2 !== undefined) patch.x2 = (sc.x2 ?? 0) + appliedDx;
+      if (sc.y2 !== undefined) patch.y2 = (sc.y2 ?? 0) + appliedDy;
       updateClip(interaction.clipId, patch);
+
+      // Move all other selected clips by the same delta (using snapshots from mousedown)
+      const multiIds = interaction.multiIds || stateRef.current.selectedElementIds.filter(id => id !== interaction.clipId);
+      if (multiIds.length > 0) {
+        const snapshots = multiDragRef.current || {};
+        multiIds.forEach(id => {
+          const s = snapshots[id];
+          if (!s) return;
+          const cp = { x: s.x + appliedDx, y: s.y + appliedDy };
+          // Clamp (need real clip width/height from current state)
+          let clipData = null;
+          stateRef.current.tracks.forEach(t => {
+            if (t.type !== 'overlay') return;
+            const c = t.clips.find(cl => cl.id === id);
+            if (c) clipData = c;
+          });
+          if (clipData) {
+            cp.x = Math.max(0, Math.min(100 - clipData.width, cp.x));
+            cp.y = Math.max(0, Math.min(100 - clipData.height, cp.y));
+          }
+          // Sync endpoints from snapshot
+          if (s.x1 !== undefined) cp.x1 = (s.x1 ?? 0) + appliedDx;
+          if (s.y1 !== undefined) cp.y1 = (s.y1 ?? 0) + appliedDy;
+          if (s.x2 !== undefined) cp.x2 = (s.x2 ?? 0) + appliedDx;
+          if (s.y2 !== undefined) cp.y2 = (s.y2 ?? 0) + appliedDy;
+          updateClip(id, cp);
+        });
+      }
 
       guidesRef.current = newGuides;
       setGuides(newGuides);
@@ -1192,9 +1316,38 @@ export default function PreviewCanvas() {
       }
       updateClip(interaction.clipId, { rotation: deg });
     }
-  }, [isDrawing, interaction, getCanvasPos, computeLayout, updateClip, computeSnap, state.videos]);
+  }, [isDrawing, interaction, getCanvasPos, computeLayout, updateClip, computeSnap, state.videos, multiRect]);
 
   const handleMouseUp = useCallback((e) => {
+    // Finalize multi-select rectangle
+    if (multiRect) {
+      const mr = multiRect;
+      setMultiRect(null);
+      if (mr.w > 5 || mr.h > 5) {
+        const { pw, ph, ox, oy } = computeLayout();
+        const rLeft = ((mr.x - ox) / pw) * 100;
+        const rTop = ((mr.y - oy) / ph) * 100;
+        const rRight = ((mr.x + mr.w - ox) / pw) * 100;
+        const rBottom = ((mr.y + mr.h - oy) / ph) * 100;
+        // Find overlay clips that intersect the rectangle
+        const hits = [];
+        state.tracks.forEach(t => {
+          if (t.type !== 'overlay') return;
+          t.clips.forEach(c => {
+            if (c.type === 'video') return;
+            // Simple AABB overlap (only overlay shapes)
+            const overlap = c.x < rRight && (c.x + c.width) > rLeft &&
+              c.y < rBottom && (c.y + c.height) > rTop;
+            if (overlap) hits.push(c.id);
+          });
+        });
+        if (hits.length > 0) {
+          setSelectedIds(hits);
+        }
+      }
+      return;
+    }
+
     if (isDrawing) {
       const pos = getCanvasPos(e);
       const startPct = canvasToPct(drawStart.x, drawStart.y);
@@ -1263,9 +1416,29 @@ export default function PreviewCanvas() {
       setIsDrawing(false);
     }
     setInteraction(null);
+    multiDragRef.current = null;
     guidesRef.current = [];
     setGuides([]);
-  }, [isDrawing, drawStart, getCanvasPos, canvasToPct, state.tool, addOverlayClip]);
+  }, [isDrawing, drawStart, getCanvasPos, canvasToPct, state.tool, addOverlayClip, multiRect, computeLayout, setSelectedIds]);
+
+  // Keyboard: Delete/Backspace removes selected clip(s)
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const onKey = (e) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (state.selectedElementIds.length > 0) {
+          deleteSelectedClips();
+          e.preventDefault();
+        } else if (state.selectedElementId) {
+          deleteClip(state.selectedElementId);
+          e.preventDefault();
+        }
+      }
+    };
+    canvas.addEventListener('keydown', onKey);
+    return () => canvas.removeEventListener('keydown', onKey);
+  }, [state.selectedElementIds, state.selectedElementId, deleteSelectedClips, deleteClip]);
 
   // --- Cursor ---
   useEffect(() => {
@@ -1309,7 +1482,7 @@ export default function PreviewCanvas() {
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onMouseLeave={() => { setIsDrawing(false); setInteraction(null); guidesRef.current = []; setGuides([]); }}
+        onMouseLeave={() => { setIsDrawing(false); setInteraction(null); guidesRef.current = []; setGuides([]); setMultiRect(null); }}
       />
 
       {/* Video elements — invisible but positioned so the browser decodes frames */}

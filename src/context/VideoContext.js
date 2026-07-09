@@ -10,6 +10,7 @@ const initialState = {
     { id: 'track-overlay-1', type: 'overlay', name: 'Overlay', clips: [], collapsed: false },
   ],
   selectedElementId: null,
+  selectedElementIds: [],
   currentTime: 0,
   isPlaying: false,
   duration: 30,
@@ -203,11 +204,57 @@ function reducer(state, action) {
     }
 
     case 'SELECT_ELEMENT': {
-      return { ...state, selectedElementId: action.payload.id };
+      return {
+        ...state,
+        selectedElementId: action.payload.id,
+        selectedElementIds: action.payload.additive && action.payload.id
+          ? (state.selectedElementIds.includes(action.payload.id)
+            ? state.selectedElementIds.filter(id => id !== action.payload.id)
+            : [...state.selectedElementIds, action.payload.id])
+          : action.payload.id
+            ? [action.payload.id]
+            : [],
+      };
     }
 
     case 'DESELECT_ALL': {
-      return { ...state, selectedElementId: null };
+      return { ...state, selectedElementId: null, selectedElementIds: [] };
+    }
+
+    case 'SET_SELECTED_IDS': {
+      return {
+        ...state,
+        selectedElementIds: action.payload.ids || [],
+        selectedElementId: (action.payload.ids && action.payload.ids.length > 0) ? action.payload.ids[0] : null,
+      };
+    }
+
+    case 'DELETE_SELECTED_CLIPS': {
+      const ids = state.selectedElementIds;
+      if (ids.length === 0) return state;
+      return {
+        ...state,
+        selectedElementId: null,
+        selectedElementIds: [],
+        tracks: state.tracks.map((track) => ({
+          ...track,
+          clips: track.clips.filter((clip) => !ids.includes(clip.id)),
+        })),
+      };
+    }
+
+    case 'UPDATE_SELECTED_CLIPS': {
+      const { ids, updates } = action.payload;
+      if (!ids || ids.length === 0) return state;
+      return {
+        ...state,
+        tracks: state.tracks.map((track) => ({
+          ...track,
+          clips: track.clips.map((clip) =>
+            ids.includes(clip.id) ? { ...clip, ...updates } : clip
+          ),
+        })),
+      };
     }
 
     case 'SET_EXPORTING': {
@@ -494,7 +541,22 @@ export function VideoProvider({ children }) {
   );
 
   const selectElement = useCallback(
-    (id) => dispatch({ type: 'SELECT_ELEMENT', payload: { id } }),
+    (id, additive = false) => dispatch({ type: 'SELECT_ELEMENT', payload: { id, additive } }),
+    []
+  );
+
+  const setSelectedIds = useCallback(
+    (ids) => dispatch({ type: 'SET_SELECTED_IDS', payload: { ids } }),
+    []
+  );
+
+  const deleteSelectedClips = useCallback(
+    () => dispatch({ type: 'DELETE_SELECTED_CLIPS' }),
+    []
+  );
+
+  const updateSelectedClips = useCallback(
+    (ids, updates) => dispatch({ type: 'UPDATE_SELECTED_CLIPS', payload: { ids, updates } }),
     []
   );
 
@@ -628,6 +690,9 @@ export function VideoProvider({ children }) {
     deleteImage,
     selectElement,
     deselectAll,
+    setSelectedIds,
+    deleteSelectedClips,
+    updateSelectedClips,
     setCurrentTime,
     setIsPlaying,
     setTool,
