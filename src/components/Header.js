@@ -13,14 +13,14 @@ import {
 } from 'lucide-react';
 
 const tools = [
-  { id: 'select', icon: MousePointer2, label: 'Select (V)' },
-  { id: 'rect', icon: Square, label: 'Rectangle (R)' },
-  { id: 'circle', icon: Circle, label: 'Circle (C)' },
-  { id: 'triangle', icon: Triangle, label: 'Triangle (T)' },
-  { id: 'pen', icon: Pencil, label: 'Pen (P)' },
-  { id: 'arrow', icon: ArrowRight, label: 'Arrow (A)' },
-  { id: 'line', icon: Minus, label: 'Line (L)' },
-  { id: 'text', icon: Type, label: 'Text (X)' },
+  { id: 'select', icon: MousePointer2, label: 'Select' },
+  { id: 'rect', icon: Square, label: 'Rectangle' },
+  { id: 'circle', icon: Circle, label: 'Circle' },
+  { id: 'triangle', icon: Triangle, label: 'Triangle' },
+  { id: 'pen', icon: Pencil, label: 'Pen' },
+  { id: 'arrow', icon: ArrowRight, label: 'Arrow' },
+  { id: 'line', icon: Minus, label: 'Line' },
+  { id: 'text', icon: Type, label: 'Text' },
 ];
 
 export default function Header() {
