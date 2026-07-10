@@ -400,15 +400,28 @@ export default function PreviewCanvas() {
       // During export: canvas.width = native video width (e.g., 1920px) → scale > 1
       const pxScale = er ? (layoutW / Math.max(containerSizeRef.current.width, 1)) : 1;
 
-      // Preview-area aspect matches the first video clip's native ratio.
-      // Every video on the timeline gets letterboxed/pillarboxed within this
-      // frame, so the export aspect ratio is consistent regardless of clip mix.
-      const firstEntry = Object.values(videoRefs.current).find(
-        e => e.videoEl && e.videoEl.videoWidth > 0
-      );
-      const layoutAspect = firstEntry
-        ? firstEntry.videoEl.videoWidth / firstEntry.videoEl.videoHeight
-        : 16 / 9;
+      // Preview-area aspect is locked to the very first video track clip's
+      // native ratio by reading from state, so the canvas stays consistent
+      // regardless of which clip is currently playing or has loaded.
+      let refW = 1920, refH = 1080;
+      for (const track of s.tracks) {
+        if (track.type !== 'video') continue;
+        for (const clip of track.clips) {
+          if (clip.type !== 'video') continue;
+          const entry = videoRefs.current[clip.id];
+          const video = entry?.videoEl;
+          if (video && video.videoWidth > 0) {
+            refW = video.videoWidth;
+            refH = video.videoHeight;
+          } else if (clip.width && clip.height) {
+            refW = clip.width;
+            refH = clip.height;
+          }
+          break;
+        }
+        break;
+      }
+      const layoutAspect = refW / refH;
 
       const { w, h, pw, ph, ox, oy } = getLayout(layoutW, layoutH, layoutAspect);
 
@@ -438,17 +451,22 @@ export default function PreviewCanvas() {
           const video = entry?.videoEl;
           if (!video || video.readyState < 2) return;
 
+          // Fit each video within the preview area (object-fit: contain) so
+          // videos with different aspect ratios are never cropped — they are
+          // scaled down and centered with letterbox/pillarbox bars.
           const vAspect = (video.videoWidth || 1920) / (video.videoHeight || 1080);
           const pAspect = pw / ph;
           let dw, dh, dx, dy;
           if (vAspect > pAspect) {
-            dh = ph; dw = dh * vAspect;
-            dx = ox - (dw - pw) / 2;
-            dy = oy;
-          } else {
+            // Video is wider than canvas → fit by width
             dw = pw; dh = dw / vAspect;
             dx = ox;
             dy = oy - (dh - ph) / 2;
+          } else {
+            // Video is taller than canvas → fit by height
+            dh = ph; dw = dh * vAspect;
+            dx = ox - (dw - pw) / 2;
+            dy = oy;
           }
 
           ctx.save();
@@ -1740,6 +1758,34 @@ export default function PreviewCanvas() {
         onMouseUp={handleMouseUp}
         onMouseLeave={() => { setIsDrawing(false); setInteraction(null); setCropInteraction(null); guidesRef.current = []; setGuides([]); setMultiRect(null); }}
       />
+
+      {/* Export loading overlay — covers the canvas during background export */}
+      {state.isExporting && (
+        <div className="export-overlay">
+          <div className="export-overlay-content">
+            <div className="export-overlay-spinner" />
+            <div className="export-overlay-label">
+              {state.exportProgress > 100
+                ? 'Converting to MP4…'
+                : `Exporting ${state.exportProgress}%`}
+            </div>
+            {state.exportProgress > 100 ? null : (
+              <div className="export-overlay-bar-track">
+                <div
+                  className="export-overlay-bar-fill"
+                  style={{ width: `${state.exportProgress}%` }}
+                />
+              </div>
+            )}
+            <button
+              className="export-overlay-cancel"
+              onClick={() => setExporting(false, 0)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Crop mode toolbar with Check and X buttons */}
       {state.cropMode?.active && (

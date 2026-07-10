@@ -847,6 +847,73 @@ textarea:focus {
   height: 100%;
 }
 
+/* ===== Export Overlay ===== */
+.export-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.export-overlay-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+}
+
+.export-overlay-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #4a9eff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.export-overlay-label {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.export-overlay-bar-track {
+  width: 200px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.export-overlay-bar-fill {
+  height: 100%;
+  background: #4a9eff;
+  border-radius: 2px;
+  transition: width 0.15s ease;
+}
+
+.export-overlay-cancel {
+  padding: 6px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.export-overlay-cancel:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
 /* ===== Timeline ===== */
 .timeline {
   display: flex;
