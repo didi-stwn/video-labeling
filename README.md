@@ -30,13 +30,13 @@ A browser-based video editing application built with React that lets you import 
 - **Keyboard shortcuts** — play/pause (Space), seek forward/back
 
 ### Drawing Tools ([`Header.js`](src/components/Header.js))
-- **Selection tool (V)** — select, drag, resize, and rotate overlays on the canvas
-- **Rectangle (R)** — draw filled/stroked rectangles
-- **Circle (C)** — draw ellipses
-- **Triangle (T)** — draw triangles
-- **Arrow (A)** — draw arrows with arrowhead
-- **Line (L)** — draw straight lines
-- **Text (X)** — add text labels
+- **Selection tool** — select, drag, resize, and rotate overlays on the canvas
+- **Rectangle** — draw filled/stroked rectangles
+- **Circle** — draw ellipses
+- **Triangle** — draw triangles
+- **Arrow** — draw arrows with arrowhead
+- **Line** — draw straight lines
+- **Text** — add text labels
 
 ### Properties Panel ([`PropertiesPanel.js`](src/components/PropertiesPanel.js))
 - **Position & Size** — edit X/Y position (%), width/height (%), rotation angle
