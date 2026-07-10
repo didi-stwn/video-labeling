@@ -425,6 +425,9 @@ export default function PreviewCanvas() {
       ctx.fillStyle = '#111';
       ctx.fillRect(ox, oy, pw, ph);
 
+      // Determine if we're in active crop mode (to suppress clip.crop on that clip so full content shows)
+      const activeCropClipId = stateRef.current.cropMode?.active ? stateRef.current.cropMode.clipId : null;
+
       // === Draw active video frames (with crop clipping if applicable) ===
       s.tracks.forEach((track) => {
         if (track.type !== 'video') return;
@@ -449,8 +452,8 @@ export default function PreviewCanvas() {
           }
 
           ctx.save();
-          // Apply crop clipping if the clip has a crop
-          if (clip.crop) {
+          // Apply crop clipping if the clip has a crop (skip during active crop mode for this clip)
+          if (clip.crop && clip.id !== activeCropClipId) {
             const cropPx = {
               x: ox + (clip.crop.x / 100) * pw,
               y: oy + (clip.crop.y / 100) * ph,
@@ -481,8 +484,8 @@ export default function PreviewCanvas() {
           ctx.save();
           ctx.globalAlpha = clip.opacity ?? 1;
 
-          // Apply crop clipping for overlay image/video clips
-          if (clip.crop && (clip.type === 'image' || clip.type === 'video')) {
+          // Apply crop clipping for overlay image/video clips (skip during active crop mode for this clip)
+          if (clip.crop && (clip.type === 'image' || clip.type === 'video') && clip.id !== activeCropClipId) {
             const cropPx = {
               x: cx + (clip.crop.x / 100) * cw2,
               y: cy + (clip.crop.y / 100) * ch2,

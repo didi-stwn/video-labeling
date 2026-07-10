@@ -454,6 +454,7 @@ export default function PropertiesPanel() {
             <button
               className="prop-crop-btn"
               onClick={() => {
+                // Use previous crop as starting boundary so user can adjust it
                 const cropRect = element.crop || { x: 0, y: 0, width: 100, height: 100 };
                 enterCropMode(element.id, cropRect);
               }}
